@@ -1,0 +1,4 @@
+*.swp
+*.pyc
+checkpoint*
+log
