@@ -114,6 +114,13 @@ def run_training():
   sess = tf.Session()
   sess.run(tf.initialize_all_variables())
 
+  checkpoint = tf.train.latest_checkpoint(".")
+  if checkpoint:
+    print "restoring from checkpoint", checkpoint
+    saver.restore(sess, checkpoint)
+  else:
+    print "couldn't find checkpoint to restore from."
+
   while True:
     start_time = time.time()
 
