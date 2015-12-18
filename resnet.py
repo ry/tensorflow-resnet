@@ -6,8 +6,8 @@ import time
 
 flags = tf.app.flags
 FLAGS = flags.FLAGS
-flags.DEFINE_float('learning_rate', 0.01, 'Initial learning rate.')
-flags.DEFINE_integer('batch_size', 1, 'Batch size.  '
+flags.DEFINE_float('learning_rate', 0.1, 'Initial learning rate.')
+flags.DEFINE_integer('batch_size', 25, 'Batch size.  '
                      'Must divide evenly into the dataset sizes.')
 flags.DEFINE_string('summary_dir', 'log', 'Where to put the summary logs')
 flags.DEFINE_string('images', None, 'where to find training images')
@@ -105,7 +105,7 @@ def run_training():
   loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits, labels))
   tf.scalar_summary("loss", loss)
 
-  opt = tf.train.GradientDescentOptimizer(FLAGS.learning_rate)
+  opt = tf.train.MomentumOptimizer(FLAGS.learning_rate, 0.9)
   train_op = opt.minimize(loss)
   summary_op = tf.merge_all_summaries()
 
