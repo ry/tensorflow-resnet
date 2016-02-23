@@ -20,7 +20,7 @@ def preprocess(img):
     out = out[:, :, [2,1,0]] # swap channel from RGB to BGR
     out -= mean_bgr
     return out
-    
+
 def assert_almost_equal(caffe_tensor, tf_tensor):
     t = tf_tensor[0]
     c = caffe_tensor[0].transpose((1,2,0))
@@ -53,10 +53,38 @@ def load_image(path):
     resized_img = skimage.transform.resize(crop_img, (224, 224))
     return resized_img
 
+# Input to this model should be RGB images with [0,1] pixels
 class ResNet():
     def __init__(self, caffe_net):
         self.caffe_net = caffe_net
 
+    def preprocess(self, rgb):
+        rgb_scaled = rgb * 255.0
+
+        red, green, blue = tf.split(3, 3, rgb_scaled) 
+
+        # In the original caffe model they subtract per-pixel means
+        # but that forces the model to have 224 x 224 inputs. Because
+        # channel variance isn't huge, we do what VGG does and just center
+        # the data based on channel means. 
+        # https://github.com/KaimingHe/deep-residual-networks/issues/5#issuecomment-183578514
+
+        #blue var 35.377156
+        #green var 24.383125
+        #red var 10.690761
+        blue_mean = 103.062624
+        green_mean = 115.902883
+        red_mean = 123.151631
+
+        bgr = tf.concat(3, [
+            blue - blue_mean,
+            green - green_mean,
+            red - red_mean,
+        ], name="centered_bgr")
+
+        return bgr    
+    
+    
 
     def bn(self, bn_name, scale_name, x):
         d = depth(x)
@@ -168,6 +196,9 @@ class ResNet():
 
 
     def build50(self, x):
+        with tf.variable_scope('preprocess'):
+            x = self.preprocess(x)
+
         with tf.variable_scope('conv1'):
             x = self.conv('conv1', x, out_chans=64, shape=7, strides=2)
             x = self.bn('bn_conv1', 'scale_conv1', x)
@@ -229,6 +260,17 @@ def load_caffe(img_p):
     return net
 
 
+def save_graph(save_path):
+    graph = tf.get_default_graph()
+    graph_def = graph.as_graph_def()
+    print "graph_def byte size", graph_def.ByteSize()
+    graph_def_s = graph_def.SerializeToString()
+
+    with open(save_path, "wb") as f:
+      f.write(graph_def_s)
+
+    print "saved model to %s" % save_path
+
 def main(_):
     img = load_image("cat.jpg")
     img_p = preprocess(img)
@@ -259,7 +301,7 @@ def main(_):
     ]
 
     o = sess.run(i, {
-        images: img_p[np.newaxis,:]
+        images: img[np.newaxis,:]
     })
 
     assert_almost_equal(net.blobs['conv1'].data, o[0])
@@ -274,6 +316,8 @@ def main(_):
     assert same_tensor(net.blobs['prob'].data, o[9])
 
     utils.print_prob(o[9][0])
+
+    save_graph("resnet-50.tfmodel")
 
 
 
