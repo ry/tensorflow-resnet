@@ -11,10 +11,14 @@ TensorFlow.
 Running the conversion script, of course, depends on both Caffe and TensorFlow
 both being installed.  You will also need to downlaod the Caffe pretrained
 models from [here](https://github.com/KaimingHe/deep-residual-networks).
-Running the converted model only depends on TensorFlow. You can download it
+Running the converted model only depends on TensorFlow. Download it
 with BitTorrent:
 
 [resnet-50-20160223.tfmodel.torrent](https://github.com/ry/tensorflow-resnet/raw/master/resnet-50-20160223.tfmodel.torrent) (138M)
+
+[resnet-101-20160223.tfmodel.torrent](https://github.com/ry/tensorflow-resnet/raw/master/resnet-101-20160223.tfmodel.torrent) (210M)
+
+[resnet-152-20160223.tfmodel.torrent](https://github.com/ry/tensorflow-resnet/raw/master/resnet-152-20160223.tfmodel.torrent) (270M)
 
 The forward.py script shows how to use it.
 
