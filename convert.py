@@ -38,10 +38,6 @@ def assert_almost_equal(caffe_tensor, tf_tensor):
     print "d", d
     assert d < 500
 
-def same_tensor(a, b):
-    return np.linalg.norm(a - b) < 0.1
-
-
 # returns image of shape [224, 224, 3]
 # [height, width, depth]
 def load_image(path):
@@ -140,6 +136,25 @@ class ResNet():
         assert kernel_shape[3] == out_chans
         return tf.nn.conv2d(x, kernel, strides=[1, strides, strides, 1], padding='SAME', name='conv')
 
+    def _bottleneck_block(self, name, x, num_units, out_chan1, out_chan2, down_stride, use_letters):
+        for i in range(0, num_units):
+            ds = (i == 0 and down_stride)
+            if i == 0:
+                unit_name = '%sa' % name
+            elif use_letters:
+                unit_name = '%s%c' % (name, ord('a') + i) 
+            else:
+                unit_name = '%sb%d' % (name, i) 
+                
+            x = self.bottleneck_unit(unit_name, x, out_chan1, out_chan2, ds)
+        return x
+
+    def bottleneck_block(self, name, x, num_units, out_chan1, out_chan2, down_stride):
+        return self._bottleneck_block(name, x, num_units, out_chan1, out_chan2, down_stride, use_letters=False)
+
+    def bottleneck_block_letters(self, name, x, num_units, out_chan1, out_chan2, down_stride):
+        return self._bottleneck_block(name, x, num_units, out_chan1, out_chan2, down_stride, use_letters=True)
+
     # name should be of the form '2a' or '2b', because it will attempt
     # to expand name to match the layers in caffe
     def bottleneck_unit(self, name, x, out_chan1, out_chan2, down_stride=False):
@@ -194,8 +209,7 @@ class ResNet():
         x = tf.nn.bias_add(x, b)
         return x
 
-
-    def build50(self, x):
+    def build(self, x, layers):
         with tf.variable_scope('preprocess'):
             x = self.preprocess(x)
 
@@ -206,27 +220,22 @@ class ResNet():
 
         x = tf.nn.max_pool(x, [1,3,3,1], [1,2,2,1], padding='SAME', name='pool1')
 
-        x = self.bottleneck_unit('2a', x, 64, 256, False)
-        x = self.bottleneck_unit('2b', x, 64, 256, False)
-        x = self.bottleneck_unit('2c', x, 64, 256, False)
+        x = self.bottleneck_block_letters('2', x, 3, 64, 256, False)
 
-        x = self.bottleneck_unit('3a', x, 128, 512, True)
-        x = self.bottleneck_unit('3b', x, 128, 512, False)
-        x = self.bottleneck_unit('3c', x, 128, 512, False)
-        x = self.bottleneck_unit('3d', x, 128, 512, False)
+        if layers == 50:
+            x = self.bottleneck_block_letters('3', x, 4, 128, 512, True)
+            x = self.bottleneck_block_letters('4', x, 6, 256, 1024, True)
+        elif layers == 101:
+            x = self.bottleneck_block('3', x, 4, 128, 512, True)
+            x = self.bottleneck_block('4', x, 23, 256, 1024, True)
+        elif layers == 152:
+            x = self.bottleneck_block('3', x, 8, 128, 512, True)
+            x = self.bottleneck_block('4', x, 36, 256, 1024, True)
+        else:
+            pr
+            assert False, "bad layers val"
 
-        x = self.bottleneck_unit('4a', x, 256, 1024, True)
-        x = self.bottleneck_unit('4b', x, 256, 1024, False)
-        x = self.bottleneck_unit('4c', x, 256, 1024, False)
-        x = self.bottleneck_unit('4d', x, 256, 1024, False)
-        x = self.bottleneck_unit('4e', x, 256, 1024, False)
-        x = self.bottleneck_unit('4f', x, 256, 1024, False)
-
-        x = self.bottleneck_unit('5a', x, 512, 2048, True)
-        x = self.bottleneck_unit('5b', x, 512, 2048, False)
-        x = self.bottleneck_unit('5c', x, 512, 2048, False)
-
-        print x.get_shape()
+        x = self.bottleneck_block_letters('5', x, 3, 512, 2048, True)
 
         x = tf.nn.avg_pool(x, [1,7,7,1], [1,1,1,1], padding='VALID', name='pool5')
 
@@ -245,16 +254,18 @@ def load_mean_bgr():
 
     return mean_bgr.transpose((1,2,0))
 
-def load_caffe(img_p):
+def load_caffe(img_p, layers=50):
     caffe.set_mode_cpu()
-    net = caffe.Net("ResNet-50-deploy.prototxt", "ResNet-50-model.caffemodel", caffe.TEST)
+
+    prototxt = "ResNet-%d-deploy.prototxt" % layers
+    caffemodel = "ResNet-%d-model.caffemodel" % layers
+    net = caffe.Net(prototxt, caffemodel, caffe.TEST)
 
     net.blobs['data'].data[0] = img_p.transpose((2,0,1))
     assert net.blobs['data'].data[0].shape == (3, 224, 224)
     net.forward()
 
     caffe_prob = net.blobs['prob'].data[0]
-
     utils.print_prob(caffe_prob)
 
     return net
@@ -271,21 +282,15 @@ def save_graph(save_path):
 
     print "saved model to %s" % save_path
 
-def main(_):
-    img = load_image("cat.jpg")
-    img_p = preprocess(img)
-
-    net = load_caffe(img_p)
-
+def convert(graph, img, img_p, layers):
+    net = load_caffe(img_p, layers)
     with tf.device('/cpu:0'):
         images = tf.placeholder("float32", [None, 224, 224, 3], name="images")
         m = ResNet(net)
-        m.build50(images)
-
+        m.build(images, layers)
     sess = tf.Session()
     sess.run(tf.initialize_all_variables())
-    graph = tf.get_default_graph()
-    #conv1_conv = graph.get_operation_by_name("conv1/conv").outputs[0]
+
 
     i = [
         graph.get_tensor_by_name("conv1/relu:0"),
@@ -294,7 +299,6 @@ def main(_):
         graph.get_tensor_by_name("res2b/relu:0"),
         graph.get_tensor_by_name("res2c/relu:0"),
         graph.get_tensor_by_name("res3a/relu:0"),
-        graph.get_tensor_by_name("res3b/relu:0"),
         graph.get_tensor_by_name("res5c/relu:0"),
         graph.get_tensor_by_name("pool5:0"),
         graph.get_tensor_by_name("prob:0"),
@@ -310,15 +314,26 @@ def main(_):
     assert_almost_equal(net.blobs['res2b'].data, o[3])
     assert_almost_equal(net.blobs['res2c'].data, o[4])
     assert_almost_equal(net.blobs['res3a'].data, o[5])
-    assert_almost_equal(net.blobs['res3b'].data, o[6])
-    assert_almost_equal(net.blobs['res5c'].data, o[7])
-    assert_almost_equal(net.blobs['pool5'].data, o[8])
-    assert same_tensor(net.blobs['prob'].data, o[9])
+    assert_almost_equal(net.blobs['res5c'].data, o[6])
+    assert_almost_equal(net.blobs['pool5'].data, o[7])
 
-    utils.print_prob(o[9][0])
+    utils.print_prob(o[8][0])
 
-    save_graph("resnet-50.tfmodel")
+    prob_dist = np.linalg.norm(net.blobs['prob'].data - o[8])
+    print 'prob_dist ', prob_dist
+    assert prob_dist < 0.2 # XXX can this be tightened?
 
+    save_graph("resnet-%d.tfmodel" % layers)
+
+def main(_):
+    img = load_image("cat.jpg")
+    img_p = preprocess(img)
+
+    for layers in [50, 101, 152]:
+        g = tf.Graph()
+        with g.as_default():
+            print "CONVERT", layers
+            convert(g, img, img_p, layers)
 
 
 if __name__ == '__main__':

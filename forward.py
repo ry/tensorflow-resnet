@@ -2,7 +2,7 @@ import tensorflow as tf
 import utils
 
 
-with open("resnet-50.tfmodel", mode='rb') as f:
+with open("resnet-152.tfmodel", mode='rb') as f:
   fileContent = f.read()
 
 graph_def = tf.GraphDef()
