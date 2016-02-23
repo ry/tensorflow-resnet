@@ -1,4 +1,5 @@
 *.swp
 *.pyc
-checkpoint*
-log
+.ipynb_checkpoints/
+*.caffemodel
+*.tfmodel
