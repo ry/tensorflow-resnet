@@ -22,3 +22,16 @@ with BitTorrent:
 
 The forward.py script shows how to use it.
 
+## Notes
+
+* The convert.py script checks that activations are similiar to the caffe version
+  but it's not exactly the same. This is because TensorFlow handles padding slightly
+  differently and because I preprocess by subtracting channel level means instead of 
+  pixel means.
+
+* I wanted to experiement with resizing the network to handle input other than
+  224 x 224 images. Therefore I do not use the pixel-wise means in preprocessing
+  but instead channel means. You can resize input down to 65x65 images.
+
+* I have not yet checked that the error rates are the same as MSRA's model. I
+  will do this soon and update.

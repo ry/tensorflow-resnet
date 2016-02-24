@@ -237,7 +237,10 @@ class ResNet():
 
         x = self.bottleneck_block_letters('5', x, 3, 512, 2048, True)
 
-        x = tf.nn.avg_pool(x, [1,7,7,1], [1,1,1,1], padding='VALID', name='pool5')
+        # avg pool. Use reduce_mean instead of tf.nn.avg_pool so we don't 
+        # have to fix a kernel size and allow the network to handle variable
+        # sized input.
+        x = tf.reduce_mean(x, [1, 2], keep_dims=True, name='pool5')
 
         x = self.fc('fc1000', x, 1000)
         return tf.nn.softmax(x, name='prob') 
