@@ -2,7 +2,8 @@ import tensorflow as tf
 import utils
 
 # size = 65 # minimum input size
-size = 224 # training size
+#size = 224 # training size
+size = 4000
 
 with open("resnet-152.tfmodel", mode='rb') as f:
   fileContent = f.read()
