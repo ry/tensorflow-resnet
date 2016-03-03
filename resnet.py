@@ -35,8 +35,6 @@ class Model():
 
         return bgr    
     
-    
-
     def bn(self, bn_name, scale_name, x):
         d = depth(x)
         mean, var, gamma, beta = self.param_provider.bn_params(bn_name, scale_name, d)

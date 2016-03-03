@@ -54,16 +54,22 @@ class CaffeParamProvider():
 
         return kernel
 
-    def bn_params(self, bn_name, scale_name, d):
+    def bn_params(self, bn_name, scale_name, depth):
         mean = self.caffe_net.params[bn_name][0].data
-        var = self.caffe_net.params[bn_name][1].data
-        gamma = self.caffe_net.params[scale_name][0].data
-        beta = self.caffe_net.params[scale_name][1].data
+        assert mean.shape == (depth,)
+        mean = tf.constant(mean, dtype='float32', name='mean')
 
-        assert mean.shape == (d,)
-        assert var.shape == (d,)
-        assert gamma.shape == (d,)
-        assert beta.shape == (d,)
+        var = self.caffe_net.params[bn_name][1].data
+        assert var.shape == (depth,)
+        var = tf.constant(var, dtype='float32', name='var')
+
+        gamma = self.caffe_net.params[scale_name][0].data
+        assert gamma.shape == (depth,)
+        gamma = tf.constant(gamma, dtype='float32', name='gamma')
+
+        beta = self.caffe_net.params[scale_name][1].data
+        assert beta.shape == (depth,)
+        beta = tf.constant(beta, dtype='float32', name='beta')
 
         return mean, var, gamma, beta
 
