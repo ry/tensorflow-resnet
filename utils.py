@@ -2,8 +2,7 @@ import skimage
 import skimage.io
 import skimage.transform
 import numpy as np
-
-synset = [l.strip() for l in open('synset.txt').readlines()]
+from synset import *
 
 # returns image of shape [224, 224, 3]
 # [height, width, depth]
@@ -19,8 +18,13 @@ def load_image(path, size=224):
   xx = int((img.shape[1] - short_edge) / 2)
   crop_img = img[yy : yy + short_edge, xx : xx + short_edge]
   # resize to 224, 224
-  resized_img = skimage.transform.resize(crop_img, (size, size))
-  return resized_img
+  img = skimage.transform.resize(crop_img, (size, size))
+
+  if len(img.shape) == 2:
+    # if it's a black and white photo, we need to change it to 3 channel
+    img = np.stack([img, img, img], axis=-1)
+
+  return img
 
 # returns the top1 string
 def print_prob(prob):
