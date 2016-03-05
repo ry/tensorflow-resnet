@@ -37,9 +37,9 @@ class Model():
     
     def bn(self, bn_name, scale_name, x):
         d = depth(x)
-        mean, var, gamma, beta = self.param_provider.bn_params(bn_name, scale_name, d)
-        return tf.nn.batch_norm_with_global_normalization(x, mean, var,
-            beta, gamma, 1e-12, scale_after_normalization=True, name='bn')
+        mean, var, scale, offset = self.param_provider.bn_params(bn_name, scale_name, d)
+        return tf.nn.batch_normalization(x, mean, var,
+            offset, scale, variance_epsilon=1e-12, name='bn')
 
     def conv(self, name, x, out_chans, shape, strides):
         in_chans = x.get_shape().as_list()[3]

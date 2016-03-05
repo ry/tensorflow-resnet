@@ -63,15 +63,15 @@ class CaffeParamProvider():
         assert var.shape == (depth,)
         var = tf.constant(var, dtype='float32', name='var')
 
-        gamma = self.caffe_net.params[scale_name][0].data
-        assert gamma.shape == (depth,)
-        gamma = tf.constant(gamma, dtype='float32', name='gamma')
+        scale = self.caffe_net.params[scale_name][0].data
+        assert scale.shape == (depth,)
+        scale = tf.constant(scale, dtype='float32', name='scale')
 
-        beta = self.caffe_net.params[scale_name][1].data
-        assert beta.shape == (depth,)
-        beta = tf.constant(beta, dtype='float32', name='beta')
+        offset = self.caffe_net.params[scale_name][1].data
+        assert offset.shape == (depth,)
+        offset = tf.constant(offset, dtype='float32', name='offset')
 
-        return mean, var, gamma, beta
+        return mean, var, scale, offset
 
     def fc_params(self, name):
         weights = self.caffe_net.params[name][0].data
