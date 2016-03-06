@@ -36,14 +36,14 @@ Unfortunately, it runs less accurately than the published error rates for
 Caffe - I suspect it's due to the padding algorithms being slightly different.
 Maybe fine-tuning will help. Use `test_error_rate.py` to check:
 
-  model|top-1|top-5
-  :---:|:---:|:---:
-  [VGG-16](http://www.vlfeat.org/matconvnet/pretrained/)|[28.5%](http://www.vlfeat.org/matconvnet/pretrained/)|[9.9%](http
-  TF ResNet-50|27.4%|9.0%
-  TF ResNet-101|26.1%|8.1%
-  Caffe ResNet-50|24.7%|7.8%
-  TF ResNet-152|25.2%|7.2%
-  Caffe ResNet-101|23.6%|7.1%
-  Caffe ResNet-152|23.0%|6.7%
+  model | top-1 | top-5
+  :---: | :---: | :---:
+  Caffe VGG-16 | 28.5% | 9.9%
+  **TF ResNet-50** | 27.4% | 9.0%
+  **TF ResNet-101** | 26.1% | 8.1%
+  Caffe ResNet-50 | 24.7% | 7.8%
+  **TF ResNet-152** | 25.2% | 7.2%
+  Caffe ResNet-101 | 23.6% | 7.1%
+  Caffe ResNet-152 | 23.0% | 6.7%
 
 
