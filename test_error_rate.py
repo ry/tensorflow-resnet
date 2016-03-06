@@ -17,9 +17,8 @@ flags.DEFINE_boolean('debug', False, 'Print network output')
 
 flags.DEFINE_string('xml_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_bbox_val_v3_CLS_LOC/val', 'dir with CLS-LOC xml files')
 flags.DEFINE_string('data_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_img_val', 'data dir with images')
+flags.DEFINE_string('model', 'resnet-101.tfmodel', 'model file to test')
 
-# returns image of shape [224, 224, 3]
-# [height, width, depth]
 def load_image(path, crop_size=224, resize_size=256):
     img = skimage.io.imread(path)
     img = img / 255.0
@@ -39,6 +38,27 @@ def load_image(path, crop_size=224, resize_size=256):
     assert img.shape == (crop_size, crop_size, 3)
 
     return img
+
+#
+#def load_image(path, size=224):
+#    # load image
+#    img = skimage.io.imread(path)
+#    img = img / 255.0
+#    assert (0 <= img).all() and (img <= 1.0).all()
+#    #print "Original Image Shape: ", img.shape
+#    # we crop image from center
+#    short_edge = min(img.shape[:2])
+#    yy = int((img.shape[0] - short_edge) / 2)
+#    xx = int((img.shape[1] - short_edge) / 2)
+#    crop_img = img[yy : yy + short_edge, xx : xx + short_edge]
+#    # resize to 224, 224
+#    img = skimage.transform.resize(crop_img, (size, size))
+#
+#    if len(img.shape) == 2:
+#        # if it's a black and white photo, we need to change it to 3 channel
+#        img = np.stack([img, img, img], axis=-1)
+#
+#    return img
 
 def get_label(img_fn):
     base = os.path.splitext(img_fn)[0]
@@ -82,8 +102,8 @@ def main(_):
     data = load_data()
     np.random.shuffle(data)
 
-    with open("resnet-152.tfmodel", mode='rb') as f:
-      fileContent = f.read()
+    with open(FLAGS.model, mode='rb') as f:
+        fileContent = f.read()
 
     graph_def = tf.GraphDef()
     graph_def.ParseFromString(fileContent)
@@ -109,8 +129,8 @@ def main(_):
 
         data_batch = data[total:FLAGS.batch_size + total]
 
-        imgs = [ load_image(d['filename'], FLAGS.crop_size, FLAGS.resize_size) for d in data_batch ] 
-        #fns = [ d['filename'] for d in data_batch ] 
+        imgs = [ load_image(d['filename'], FLAGS.crop_size, FLAGS.resize_size) for d in data_batch ]
+        #fns = [ d['filename'] for d in data_batch ]
         #print fns
         batch = np.stack(imgs)
         assert batch.shape == (FLAGS.batch_size, FLAGS.crop_size, FLAGS.crop_size, 3)

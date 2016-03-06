@@ -12,29 +12,24 @@ class Model():
     def preprocess(self, rgb):
         rgb_scaled = rgb * 255.0
 
-        red, green, blue = tf.split(3, 3, rgb_scaled) 
+        red, green, blue = tf.split(3, 3, rgb_scaled)
 
-        # In the original caffe model they subtract per-pixel means
-        # but that forces the model to have 224 x 224 inputs. Because
-        # channel variance isn't huge, we do what VGG does and just center
-        # the data based on channel means. 
-        # https://github.com/KaimingHe/deep-residual-networks/issues/5#issuecomment-183578514
+        mean_bgr = self.param_provider.mean_bgr()
 
-        #blue var 35.377156
-        #green var 24.383125
-        #red var 10.690761
-        blue_mean = 103.062624
-        green_mean = 115.902883
-        red_mean = 123.151631
+        # resize mean_bgr to match input
+        input_width = rgb.get_shape().as_list()[2]
+        mean_bgr = tf.image.resize_bilinear(mean_bgr, [input_width, input_width])
+
+        mean_blue, mean_green, mean_red = tf.split(3, 3, mean_bgr)
 
         bgr = tf.concat(3, [
-            blue - blue_mean,
-            green - green_mean,
-            red - red_mean,
+            blue - mean_blue,
+            green - mean_green,
+            red - mean_red,
         ], name="centered_bgr")
 
-        return bgr    
-    
+        return bgr
+
     def bn(self, bn_name, scale_name, x):
         d = depth(x)
         mean, var, scale, offset = self.param_provider.bn_params(bn_name, scale_name, d)

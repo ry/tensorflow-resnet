@@ -16,6 +16,10 @@ class CaffeParamProvider():
     def __init__(self, caffe_net):
         self.caffe_net = caffe_net
 
+    def mean_bgr(self):
+        mean_bgr = load_mean_bgr()
+        return mean_bgr.reshape((1, 224, 224, 3))
+
     # It's unfortunate that it needs all these parameters but due
     # to the bug mentioned below we have to special case the creation of
     # the kernel.

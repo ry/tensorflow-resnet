@@ -14,11 +14,11 @@ models from [here](https://github.com/KaimingHe/deep-residual-networks).
 Running the converted model only depends on TensorFlow. Download it
 with BitTorrent:
 
-[resnet-50-20160223.tfmodel.torrent](https://github.com/ry/tensorflow-resnet/raw/master/resnet-50-20160223.tfmodel.torrent) (138M)
+[resnet-50-20160305.tfmodel.torrent](https://github.com/ry/tensorflow-resnet/raw/master/resnet-50-20160305.tfmodel.torrent) (138M)
 
-[resnet-101-20160223.tfmodel.torrent](https://github.com/ry/tensorflow-resnet/raw/master/resnet-101-20160223.tfmodel.torrent) (210M)
+[resnet-101-20160305.tfmodel.torrent](https://github.com/ry/tensorflow-resnet/raw/master/resnet-101-20160305.tfmodel.torrent) (210M)
 
-[resnet-152-20160223.tfmodel.torrent](https://github.com/ry/tensorflow-resnet/raw/master/resnet-152-20160223.tfmodel.torrent) (270M)
+[resnet-152-20160305.tfmodel.torrent](https://github.com/ry/tensorflow-resnet/raw/master/resnet-152-20160305.tfmodel.torrent) (270M)
 
 The forward.py script shows how to use it.
 
@@ -26,12 +26,24 @@ The forward.py script shows how to use it.
 
 * The convert.py script checks that activations are similiar to the caffe version
   but it's not exactly the same. This is because TensorFlow handles padding slightly
-  differently and because I preprocess by subtracting channel level means instead of 
-  pixel means.
+  differentl.
 
-* I wanted to experiement with resizing the network to handle input other than
-  224 x 224 images. Therefore I do not use the pixel-wise means in preprocessing
-  but instead channel means. You can resize input down to 65x65 images.
+* Resnet is full convolutional. You can resize the network input down to 65x65 images.
 
-* I have not yet checked that the error rates are the same as MSRA's model. I
-  will do this soon and update.
+## Error Rates
+
+Unfortunately, it runs less accurately than the published error rates for
+Caffe - I suspect it's due to the padding algorithms being slightly different.
+Maybe fine-tuning will help. Use `test_error_rate.py` to check:
+
+  model|top-1|top-5
+  :---:|:---:|:---:
+  [VGG-16](http://www.vlfeat.org/matconvnet/pretrained/)|[28.5%](http://www.vlfeat.org/matconvnet/pretrained/)|[9.9%](http
+  TF ResNet-50|27.4%|9.0%
+  TF ResNet-101|26.1%|8.1%
+  Caffe ResNet-50|24.7%|7.8%
+  TF ResNet-152|25.2%|7.2%
+  Caffe ResNet-101|23.6%|7.1%
+  Caffe ResNet-152|23.0%|6.7%
+
+
