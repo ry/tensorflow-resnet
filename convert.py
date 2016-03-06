@@ -18,7 +18,7 @@ class CaffeParamProvider():
 
     def mean_bgr(self):
         mean_bgr = load_mean_bgr()
-        return mean_bgr.reshape((1, 224, 224, 3))
+        return tf.constant(mean_bgr.reshape((1, 224, 224, 3)),  dtype='float32', name="mean_bgr")
 
     # It's unfortunate that it needs all these parameters but due
     # to the bug mentioned below we have to special case the creation of
