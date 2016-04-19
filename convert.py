@@ -25,34 +25,15 @@ class CaffeParamProvider():
     # the kernel.
     def conv_kernel(self, name, in_chans, out_chans, shape, strides):
         k =  self.caffe_net.params[name][0].data
-
         # caffe      [out_channels, in_channels, filter_height, filter_width] 
         #             0             1            2              3
         # tensorflow [filter_height, filter_width, in_channels, out_channels]
         #             2              3             1            0
-
-        if strides == 2 and shape == 1:
-            # TensorFlow doesn't let you do this. BUG.
-            # https://github.com/tensorflow/tensorflow/issues/889
-            # Going to hack around this by creating a 2x2 kernel where the top left
-            # is the 1x1 kernel from caffe. 
-            # k is [out_chans, in_chans, 1, 1]
-            # need [2, 2, in_chans, out_chans]
-            z = np.zeros((2, 2, in_chans, out_chans))
-            k = k[:, :, 0, 0].transpose((1,0))
-            assert k.shape == (in_chans, out_chans)
-            z[0,0,:,:] = k
-            kernel = tf.constant(z,  dtype='float32', name="kernel")
-            kernel_shape = kernel.get_shape().as_list()
-            assert kernel_shape[0] == 2
-            assert kernel_shape[1] == 2
-        else:
-            kernel = tf.constant(k.transpose((2, 3, 1, 0)),  dtype='float32',
-                name="kernel")
-            kernel_shape = kernel.get_shape().as_list()
-            assert kernel_shape[0] == shape
-            assert kernel_shape[1] == shape
-
+        kernel = tf.constant(k.transpose((2, 3, 1, 0)),  dtype='float32',
+            name="kernel")
+        kernel_shape = kernel.get_shape().as_list()
+        assert kernel_shape[0] == shape
+        assert kernel_shape[1] == shape
         assert kernel_shape[2] == in_chans
         assert kernel_shape[3] == out_chans
 
