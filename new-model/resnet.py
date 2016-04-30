@@ -12,18 +12,18 @@ import slim
 FLAGS = tf.app.flags.FLAGS
 
 
-def inferene(inputs,
-             num_classes=1000,
-             is_training=True,
-             num_layers=[2, 2, 2, 2], # defaults to 18-layer network
-             bottleneck=False, 
-             restore_logits=True,
-             scope=''):
+def inference(inputs,
+              num_classes=1000,
+              is_training=True,
+              num_layers=[2, 2, 2, 2],  # defaults to 18-layer network
+              bottleneck=False,
+              restore_logits=True,
+              scope=''):
     batch_norm_params = {
         'decay': 0.9997,
         'epsilon': 0.001,
     }
-    #with tf.op_scope([inputs], scope, 'ResNet'):
+    # with tf.op_scope([inputs], scope, 'ResNet'):
 
     with slim.arg_scope([slim.conv2d, slim.fc], weight_decay=0.00004),
          slim.arg_scope([slim.conv2d],
@@ -76,46 +76,35 @@ def resnet_block(inputs,
     else:
         num_filters_out = num_filters
   
-    with tf.variable_op_scope([inputs], scope, 'Block', reuse=reuse):
+    with tf.variable_op_scope([inputs], scope, 'Block', reuse=reuse),
+         slim.arg_scope([slim.conv2d], kernel_size=[3,3], strides=1,
+                        num_filters_out=num_filters):
         b1 = inputs
         b2 = inputs
 
         with tf.variable_scope('Branch1'):
             if input_depth != num_filters_out:
                 b1 = slim.conv2d(b1,
-                                num_filters=num_filters,
-                                kernel_size=[1, 1],
-                                strides=strides,
-                                activation=None)
+                                 kernel_size=[1, 1],
+                                 strides=strides,
+                                 activation=None)
   
         with tf.variable_scope('Branch2'):
             if bottleneck:
-                b2 = slim.conv2d(b2,
-                                num_filters_out=num_filters,
-                                kernel_size=[1, 1],
-                                strides=strides)
+                b2 = slim.conv2d(b2, kernel_size=[1, 1], strides=strides)
+
+                b2 = slim.conv2d(b2)
 
                 b2 = slim.conv2d(b2,
-                                num_filters_out=num_filters,
-                                kernel_size=[3, 3],
-                                strides=1)
-
-                b2 = slim.conv2d(b2,
-                                num_filters_out=num_filters_out,
-                                kernel_size=[1, 1],
-                                strides=1,
-                                activation=None)
+                                 num_filters_out=num_filters_out,
+                                 kernel_size=[1, 1],
+                                 activation=None)
                 
             else:
-                b2 = slim.conv2d(b2,
-                                num_filters_out=num_filters,
-                                kernel_size=[3, 3],
-                                strides=strides)
+                b2 = slim.conv2d(b2, strides=strides)
 
                 b2 = slim.conv2d(b2,
-                                num_filters_out=num_filters_out,
-                                kernel_size=[3, 3],
-                                strides=1,
-                                activation=None)
+                                 num_filters_out=num_filters_out,
+                                 activation=None)
   
         return tf.nn.relu(b1 + b2)
