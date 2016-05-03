@@ -31,9 +31,9 @@ import tensorflow as tf
 
 from tensorflow.python.training import moving_averages
 
-from inception.slim import losses
-from inception.slim import scopes
-from inception.slim import variables
+from . import losses
+from . import scopes
+from . import variables
 
 # Used to keep the update ops done by batch_norm.
 UPDATE_OPS_COLLECTION = '_update_ops_'
@@ -245,6 +245,10 @@ def conv2d(inputs,
       outputs = activation(outputs)
     return outputs
 
+batch_norm_params = {
+    'decay': 0.9997,
+    'epsilon': 0.001,
+}
 
 @scopes.add_arg_scope
 def fc(inputs,
@@ -253,7 +257,7 @@ def fc(inputs,
        stddev=0.01,
        bias=0.0,
        weight_decay=0,
-       batch_norm_params=None,
+       batch_norm_params=batch_norm_params,
        is_training=True,
        trainable=True,
        restore=True,
