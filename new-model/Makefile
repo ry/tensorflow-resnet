@@ -1,3 +1,3 @@
-lint: *py
-	autopep8 --in-place --aggressive --aggressive	*.py
+lint: *.py slim/*.py
+	autopep8 --in-place *.py slim/*.py
 	

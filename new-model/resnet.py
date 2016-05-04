@@ -26,17 +26,18 @@ def inference(inputs,
     # with tf.op_scope([inputs], scope, 'ResNet'):
 
     with slim.arg_scope([slim.conv2d, slim.fc], weight_decay=0.00004), \
-         slim.arg_scope([slim.conv2d],
-                        stddev=0.1,
-                        activation=tf.nn.relu,
-                        is_training=is_training,
-                        batch_norm_params=batch_norm_params), \
-         slim.arg_scope([resnet_block], bottleneck=bottleneck):
+            slim.arg_scope([slim.conv2d],
+                           stddev=0.1,
+                           activation=tf.nn.relu,
+                           is_training=is_training,
+                           batch_norm_params=batch_norm_params), \
+            slim.arg_scope([resnet_block], bottleneck=bottleneck):
 
         # pre-net
         with tf.variable_scope('Section1') as scope:
-          x = slim.conv2d(inputs, 64, [7, 7], stride=2)
-          x = tf.nn.max_pool(x, ksize=[1,3,3,1], strides=[1,2,2,1], padding='VALID')
+            x = slim.conv2d(inputs, 64, [7, 7], stride=2)
+            x = tf.nn.max_pool(x, ksize=[1, 3, 3, 1], strides=[
+                               1, 2, 2, 1], padding='VALID')
 
         # ResNet
         with tf.variable_scope('Section2'):
@@ -53,14 +54,15 @@ def inference(inputs,
             x = slim.repeat_op(num_layers[3], x, resnet_block, 512)
 
         # post-net
-        x = tf.reduce_mean(x, reduction_indices=[1,2], name="avg_pool")
+        x = tf.reduce_mean(x, reduction_indices=[1, 2], name="avg_pool")
 
         if num_classes < 0:
             return x
 
-        x = slim.fc(x, num_units_out=num_classes, bias=0.0, restore=restore_logits)
+        x = slim.fc(x, num_units_out=num_classes,
+                    bias=0.0, restore=restore_logits)
 
-        return tf.nn.softmax(x) 
+        return tf.nn.softmax(x)
 
 
 @slim.scopes.add_arg_scope
@@ -80,10 +82,10 @@ def resnet_block(inputs,
         num_filters_out = 4 * num_filters
     else:
         num_filters_out = num_filters
-  
+
     with tf.variable_op_scope([inputs], scope, 'Block', reuse=reuse), \
-         slim.arg_scope([slim.conv2d], kernel_size=[3,3], stride=1,
-                        num_filters_out=num_filters):
+        slim.arg_scope([slim.conv2d], kernel_size=[3, 3], stride=1,
+                       num_filters_out=num_filters):
         b1 = inputs
         b2 = inputs
 
@@ -93,7 +95,7 @@ def resnet_block(inputs,
                                  kernel_size=[1, 1],
                                  stride=stride,
                                  activation=None)
-  
+
         with tf.variable_scope('Branch2'):
             if bottleneck:
                 b2 = slim.conv2d(b2, kernel_size=[1, 1], stride=stride)
@@ -104,12 +106,12 @@ def resnet_block(inputs,
                                  num_filters_out=num_filters_out,
                                  kernel_size=[1, 1],
                                  activation=None)
-                
+
             else:
                 b2 = slim.conv2d(b2, stride=stride)
 
                 b2 = slim.conv2d(b2,
                                  num_filters_out=num_filters_out,
                                  activation=None)
-  
+
         return tf.nn.relu(b1 + b2)

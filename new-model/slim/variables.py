@@ -95,196 +95,198 @@ VARIABLES_TO_RESTORE = '_variables_to_restore_'
 
 
 def add_variable(var, restore=True):
-  """Adds a variable to the MODEL_VARIABLES collection.
+    """Adds a variable to the MODEL_VARIABLES collection.
 
-    Optionally it will add the variable to  the VARIABLES_TO_RESTORE collection.
-  Args:
-    var: a variable.
-    restore: whether the variable should be added to the
-      VARIABLES_TO_RESTORE collection.
+      Optionally it will add the variable to  the VARIABLES_TO_RESTORE collection.
+    Args:
+      var: a variable.
+      restore: whether the variable should be added to the
+        VARIABLES_TO_RESTORE collection.
 
-  """
-  collections = [MODEL_VARIABLES]
-  if restore:
-    collections.append(VARIABLES_TO_RESTORE)
-  for collection in collections:
-    if var not in tf.get_collection(collection):
-      tf.add_to_collection(collection, var)
+    """
+    collections = [MODEL_VARIABLES]
+    if restore:
+        collections.append(VARIABLES_TO_RESTORE)
+    for collection in collections:
+        if var not in tf.get_collection(collection):
+            tf.add_to_collection(collection, var)
 
 
 def get_variables(scope=None, suffix=None):
-  """Gets the list of variables, filtered by scope and/or suffix.
+    """Gets the list of variables, filtered by scope and/or suffix.
 
-  Args:
-    scope: an optional scope for filtering the variables to return.
-    suffix: an optional suffix for filtering the variables to return.
+    Args:
+      scope: an optional scope for filtering the variables to return.
+      suffix: an optional suffix for filtering the variables to return.
 
-  Returns:
-    a copied list of variables with scope and suffix.
-  """
-  candidates = tf.get_collection(MODEL_VARIABLES, scope)[:]
-  if suffix is not None:
-    candidates = [var for var in candidates if var.op.name.endswith(suffix)]
-  return candidates
+    Returns:
+      a copied list of variables with scope and suffix.
+    """
+    candidates = tf.get_collection(MODEL_VARIABLES, scope)[:]
+    if suffix is not None:
+        candidates = [
+            var for var in candidates if var.op.name.endswith(suffix)]
+    return candidates
 
 
 def get_variables_to_restore():
-  """Gets the list of variables to restore.
+    """Gets the list of variables to restore.
 
-  Returns:
-    a copied list of variables.
-  """
-  return tf.get_collection(VARIABLES_TO_RESTORE)[:]
+    Returns:
+      a copied list of variables.
+    """
+    return tf.get_collection(VARIABLES_TO_RESTORE)[:]
 
 
 def get_variables_by_name(given_name, scope=None):
-  """Gets the list of variables that were given that name.
+    """Gets the list of variables that were given that name.
 
-  Args:
-    given_name: name given to the variable without scope.
-    scope: an optional scope for filtering the variables to return.
+    Args:
+      given_name: name given to the variable without scope.
+      scope: an optional scope for filtering the variables to return.
 
-  Returns:
-    a copied list of variables with the given name and prefix.
-  """
-  return get_variables(scope=scope, suffix=given_name)
+    Returns:
+      a copied list of variables with the given name and prefix.
+    """
+    return get_variables(scope=scope, suffix=given_name)
 
 
 def get_unique_variable(name):
-  """Gets the variable uniquely identified by that name.
+    """Gets the variable uniquely identified by that name.
 
-  Args:
-    name: a name that uniquely identifies the variable.
+    Args:
+      name: a name that uniquely identifies the variable.
 
-  Returns:
-    a tensorflow variable.
+    Returns:
+      a tensorflow variable.
 
-  Raises:
-    ValueError: if no variable uniquely identified by the name exists.
-  """
-  candidates = tf.get_collection(tf.GraphKeys.VARIABLES, name)
-  if not candidates:
-    raise ValueError('Couldnt find variable %s' % name)
+    Raises:
+      ValueError: if no variable uniquely identified by the name exists.
+    """
+    candidates = tf.get_collection(tf.GraphKeys.VARIABLES, name)
+    if not candidates:
+        raise ValueError('Couldnt find variable %s' % name)
 
-  for candidate in candidates:
-    if candidate.op.name == name:
-      return candidate
-  raise ValueError('Variable %s does not uniquely identify a variable', name)
+    for candidate in candidates:
+        if candidate.op.name == name:
+            return candidate
+    raise ValueError('Variable %s does not uniquely identify a variable', name)
 
 
 class VariableDeviceChooser(object):
-  """Slim device chooser for variables.
+    """Slim device chooser for variables.
 
-  When using a parameter server it will assign them in a round-robin fashion.
-  When not using a parameter server it allows GPU:0 placement otherwise CPU:0.
-  """
-
-  def __init__(self,
-               num_parameter_servers=0,
-               ps_device='/job:ps',
-               placement='CPU:0'):
-    """Initialize VariableDeviceChooser.
-
-    Args:
-      num_parameter_servers: number of parameter servers.
-      ps_device: string representing the parameter server device.
-      placement: string representing the placement of the variable either CPU:0
-        or GPU:0. When using parameter servers forced to CPU:0.
+    When using a parameter server it will assign them in a round-robin fashion.
+    When not using a parameter server it allows GPU:0 placement otherwise CPU:0.
     """
-    self._num_ps = num_parameter_servers
-    self._ps_device = ps_device
-    self._placement = placement if num_parameter_servers == 0 else 'CPU:0'
-    self._next_task_id = 0
 
-  def __call__(self, op):
-    device_string = ''
-    if self._num_ps > 0:
-      task_id = self._next_task_id
-      self._next_task_id = (self._next_task_id + 1) % self._num_ps
-      device_string = '%s/task:%d' % (self._ps_device, task_id)
-    device_string += '/%s' % self._placement
-    return device_string
+    def __init__(self,
+                 num_parameter_servers=0,
+                 ps_device='/job:ps',
+                 placement='CPU:0'):
+        """Initialize VariableDeviceChooser.
+
+        Args:
+          num_parameter_servers: number of parameter servers.
+          ps_device: string representing the parameter server device.
+          placement: string representing the placement of the variable either CPU:0
+            or GPU:0. When using parameter servers forced to CPU:0.
+        """
+        self._num_ps = num_parameter_servers
+        self._ps_device = ps_device
+        self._placement = placement if num_parameter_servers == 0 else 'CPU:0'
+        self._next_task_id = 0
+
+    def __call__(self, op):
+        device_string = ''
+        if self._num_ps > 0:
+            task_id = self._next_task_id
+            self._next_task_id = (self._next_task_id + 1) % self._num_ps
+            device_string = '%s/task:%d' % (self._ps_device, task_id)
+        device_string += '/%s' % self._placement
+        return device_string
 
 
 # TODO(sguada) Remove once get_variable is able to colocate op.devices.
 def variable_device(device, name):
-  """Fix the variable device to colocate its ops."""
-  if callable(device):
-    var_name = tf.get_variable_scope().name + '/' + name
-    var_def = graph_pb2.NodeDef(name=var_name, op='Variable')
-    device = device(var_def)
-  if device is None:
-    device = ''
-  return device
+    """Fix the variable device to colocate its ops."""
+    if callable(device):
+        var_name = tf.get_variable_scope().name + '/' + name
+        var_def = graph_pb2.NodeDef(name=var_name, op='Variable')
+        device = device(var_def)
+    if device is None:
+        device = ''
+    return device
 
 
 @scopes.add_arg_scope
 def global_step(device=''):
-  """Returns the global step variable.
+    """Returns the global step variable.
 
-  Args:
-    device: Optional device to place the variable. It can be an string or a
-      function that is called to get the device for the variable.
+    Args:
+      device: Optional device to place the variable. It can be an string or a
+        function that is called to get the device for the variable.
 
-  Returns:
-    the tensor representing the global step variable.
-  """
-  global_step_ref = tf.get_collection(tf.GraphKeys.GLOBAL_STEP)
-  if global_step_ref:
-    return global_step_ref[0]
-  else:
-    collections = [
-        VARIABLES_TO_RESTORE,
-        tf.GraphKeys.VARIABLES,
-        tf.GraphKeys.GLOBAL_STEP,
-    ]
-    # Get the device for the variable.
-    with tf.device(variable_device(device, 'global_step')):
-      return tf.get_variable('global_step', shape=[], dtype=tf.int64,
-                             initializer=tf.zeros_initializer,
-                             trainable=False, collections=collections)
+    Returns:
+      the tensor representing the global step variable.
+    """
+    global_step_ref = tf.get_collection(tf.GraphKeys.GLOBAL_STEP)
+    if global_step_ref:
+        return global_step_ref[0]
+    else:
+        collections = [
+            VARIABLES_TO_RESTORE,
+            tf.GraphKeys.VARIABLES,
+            tf.GraphKeys.GLOBAL_STEP,
+        ]
+        # Get the device for the variable.
+        with tf.device(variable_device(device, 'global_step')):
+            return tf.get_variable('global_step', shape=[], dtype=tf.int64,
+                                   initializer=tf.zeros_initializer,
+                                   trainable=False, collections=collections)
 
 
 @scopes.add_arg_scope
 def variable(name, shape=None, dtype=tf.float32, initializer=None,
              regularizer=None, trainable=True, collections=None, device='',
              restore=True):
-  """Gets an existing variable with these parameters or creates a new one.
+    """Gets an existing variable with these parameters or creates a new one.
 
-    It also add itself to a group with its name.
+      It also add itself to a group with its name.
 
-  Args:
-    name: the name of the new or existing variable.
-    shape: shape of the new or existing variable.
-    dtype: type of the new or existing variable (defaults to `DT_FLOAT`).
-    initializer: initializer for the variable if one is created.
-    regularizer: a (Tensor -> Tensor or None) function; the result of
-        applying it on a newly created variable will be added to the collection
-        GraphKeys.REGULARIZATION_LOSSES and can be used for regularization.
-    trainable: If `True` also add the variable to the graph collection
-      `GraphKeys.TRAINABLE_VARIABLES` (see tf.Variable).
-    collections: A list of collection names to which the Variable will be added.
-      Note that the variable is always also added to the tf.GraphKeys.VARIABLES
-      and MODEL_VARIABLES collections.
-    device: Optional device to place the variable. It can be an string or a
-      function that is called to get the device for the variable.
-    restore: whether the variable should be added to the
-      VARIABLES_TO_RESTORE collection.
+    Args:
+      name: the name of the new or existing variable.
+      shape: shape of the new or existing variable.
+      dtype: type of the new or existing variable (defaults to `DT_FLOAT`).
+      initializer: initializer for the variable if one is created.
+      regularizer: a (Tensor -> Tensor or None) function; the result of
+          applying it on a newly created variable will be added to the collection
+          GraphKeys.REGULARIZATION_LOSSES and can be used for regularization.
+      trainable: If `True` also add the variable to the graph collection
+        `GraphKeys.TRAINABLE_VARIABLES` (see tf.Variable).
+      collections: A list of collection names to which the Variable will be added.
+        Note that the variable is always also added to the tf.GraphKeys.VARIABLES
+        and MODEL_VARIABLES collections.
+      device: Optional device to place the variable. It can be an string or a
+        function that is called to get the device for the variable.
+      restore: whether the variable should be added to the
+        VARIABLES_TO_RESTORE collection.
 
-  Returns:
-    The created or existing variable.
-  """
-  collections = list(collections or [])
+    Returns:
+      The created or existing variable.
+    """
+    collections = list(collections or [])
 
-  # Make sure variables are added to tf.GraphKeys.VARIABLES and MODEL_VARIABLES
-  collections += [tf.GraphKeys.VARIABLES, MODEL_VARIABLES]
-  # Add to VARIABLES_TO_RESTORE if necessary
-  if restore:
-    collections.append(VARIABLES_TO_RESTORE)
-  # Remove duplicates
-  collections = set(collections)
-  # Get the device for the variable.
-  with tf.device(variable_device(device, name)):
-    return tf.get_variable(name, shape=shape, dtype=dtype,
-                           initializer=initializer, regularizer=regularizer,
-                           trainable=trainable, collections=collections)
+    # Make sure variables are added to tf.GraphKeys.VARIABLES and
+    # MODEL_VARIABLES
+    collections += [tf.GraphKeys.VARIABLES, MODEL_VARIABLES]
+    # Add to VARIABLES_TO_RESTORE if necessary
+    if restore:
+        collections.append(VARIABLES_TO_RESTORE)
+    # Remove duplicates
+    collections = set(collections)
+    # Get the device for the variable.
+    with tf.device(variable_device(device, name)):
+        return tf.get_variable(name, shape=shape, dtype=dtype,
+                               initializer=initializer, regularizer=regularizer,
+                               trainable=trainable, collections=collections)

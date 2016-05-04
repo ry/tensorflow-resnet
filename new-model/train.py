@@ -25,10 +25,12 @@ def loss(inputs, lables):
     logits = resnet.inference(inputs)
     resnet.loss(logits, labels, batch_size=FLAGS.batch_size)
     losses = tf.get_collection(slim.losses.LOSSES_COLLECTION, scope)
-    regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
+    regularization_losses = tf.get_collection(
+        tf.GraphKeys.REGULARIZATION_LOSSES)
     total_loss = tf.add_n(losses + regularization_losses, name='total_loss')
     loss_averages = tf.train.ExponentialMovingAverage(0.9, name='avg')
     loss_averages_op = loss_averages.apply(losses + [total_loss])
+
 
 def train(dataset):
     global_step = tf.get_variable(
@@ -89,11 +91,7 @@ def train(dataset):
             summary_str = sess.run(summary_op)
             summary_writer.add_summary(summary_str, step)
 
-
         # Save the model checkpoint periodically.
         if step % 5000 == 0 or (step + 1) == FLAGS.max_steps:
             checkpoint_path = os.path.join(FLAGS.train_dir, 'model.ckpt')
             saver.save(sess, checkpoint_path, global_step=step)
-
-
-
