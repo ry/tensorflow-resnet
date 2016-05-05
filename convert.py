@@ -1,13 +1,14 @@
 import os
 os.environ["GLOG_minloglevel"] = "2"
 import sys
+import re
 import caffe
 import numpy as np
 import tensorflow as tf
-import utils
 import skimage
 from skimage.io import imsave
 from caffe.proto import caffe_pb2
+from synset import *
 
 import resnet
 
@@ -18,52 +19,38 @@ class CaffeParamProvider():
 
     def mean_bgr(self):
         mean_bgr = load_mean_bgr()
-        return tf.constant(mean_bgr.reshape((1, 224, 224, 3)),  dtype='float32', name="mean_bgr")
+        return mean_bgr.reshape((1, 224, 224, 3))
 
-    # It's unfortunate that it needs all these parameters but due
-    # to the bug mentioned below we have to special case the creation of
-    # the kernel.
-    def conv_kernel(self, name, in_chans, out_chans, shape, strides):
+    def conv_kernel(self, name):
         k =  self.caffe_net.params[name][0].data
         # caffe      [out_channels, in_channels, filter_height, filter_width] 
         #             0             1            2              3
         # tensorflow [filter_height, filter_width, in_channels, out_channels]
         #             2              3             1            0
-        kernel = tf.constant(k.transpose((2, 3, 1, 0)),  dtype='float32',
-            name="kernel")
-        kernel_shape = kernel.get_shape().as_list()
-        assert kernel_shape[0] == shape
-        assert kernel_shape[1] == shape
-        assert kernel_shape[2] == in_chans
-        assert kernel_shape[3] == out_chans
+        return k.transpose((2, 3, 1, 0))
+        return k
 
-        return kernel
+    def bn_gamma(self, name):
+        return self.caffe_net.params[name][0].data
 
-    def bn_params(self, bn_name, scale_name, depth):
-        mean = self.caffe_net.params[bn_name][0].data
-        assert mean.shape == (depth,)
-        mean = tf.constant(mean, dtype='float32', name='mean')
+    def bn_beta(self, name):
+        return self.caffe_net.params[name][1].data
 
-        var = self.caffe_net.params[bn_name][1].data
-        assert var.shape == (depth,)
-        var = tf.constant(var, dtype='float32', name='var')
+    def bn_mean(self, name):
+        return self.caffe_net.params[name][0].data
 
-        scale = self.caffe_net.params[scale_name][0].data
-        assert scale.shape == (depth,)
-        scale = tf.constant(scale, dtype='float32', name='scale')
+    def bn_variance(self, name):
+        return self.caffe_net.params[name][1].data
 
-        offset = self.caffe_net.params[scale_name][1].data
-        assert offset.shape == (depth,)
-        offset = tf.constant(offset, dtype='float32', name='offset')
+    def fc_weights(self, name):
+        w = self.caffe_net.params[name][0].data
+        w = w.transpose((1,0))
+        return w
 
-        return mean, var, scale, offset
+    def fc_biases(self, name):
+        b = self.caffe_net.params[name][1].data
+        return b
 
-    def fc_params(self, name):
-        weights = self.caffe_net.params[name][0].data
-        bias = self.caffe_net.params[name][1].data
-        w = tf.constant(weights.transpose((1,0)), name="weights", dtype="float32")
-        b =  tf.constant(bias, name="bias", dtype="float32")
-        return w, b
 
 
 def preprocess(img):
@@ -104,7 +91,7 @@ def load_image(path):
 
 def load_mean_bgr():
     """ bgr mean pixel value image, [0, 255]. [height, width, 3] """
-    with open("ResNet_mean.binaryproto", mode='rb') as f:
+    with open("data/ResNet_mean.binaryproto", mode='rb') as f:
         data = f.read()
     blob = caffe_pb2.BlobProto()
     blob.ParseFromString(data)
@@ -117,8 +104,8 @@ def load_mean_bgr():
 def load_caffe(img_p, layers=50):
     caffe.set_mode_cpu()
 
-    prototxt = "ResNet-%d-deploy.prototxt" % layers
-    caffemodel = "ResNet-%d-model.caffemodel" % layers
+    prototxt = "data/ResNet-%d-deploy.prototxt" % layers
+    caffemodel = "data/ResNet-%d-model.caffemodel" % layers
     net = caffe.Net(prototxt, caffemodel, caffe.TEST)
 
     net.blobs['data'].data[0] = img_p.transpose((2,0,1))
@@ -126,9 +113,22 @@ def load_caffe(img_p, layers=50):
     net.forward()
 
     caffe_prob = net.blobs['prob'].data[0]
-    utils.print_prob(caffe_prob)
+    print_prob(caffe_prob)
 
     return net
+
+# returns the top1 string
+def print_prob(prob):
+  #print prob
+  pred = np.argsort(prob)[::-1]
+
+  # Get top1 label
+  top1 = synset[pred[0]]
+  print "Top1: ", top1
+  # Get top5 label
+  top5 = [synset[pred[i]] for i in range(5)]
+  print "Top5: ", top5
+  return top1
 
 
 def save_graph(save_path):
@@ -142,52 +142,167 @@ def save_graph(save_path):
 
     print "saved model to %s" % save_path
 
+def parse_tf_varnames(p, tf_varname, num_layers):
+    if tf_varname == 'scale1/weights':
+        return p.conv_kernel('conv1')
+
+    elif tf_varname == 'scale1/gamma':
+        return p.bn_gamma('scale_conv1')
+
+    elif tf_varname == 'scale1/beta':
+        return p.bn_beta('scale_conv1')
+
+    elif tf_varname == 'scale1/moving_mean':
+        return p.bn_mean('bn_conv1')
+
+    elif tf_varname == 'scale1/moving_variance':
+        return p.bn_variance('bn_conv1')
+
+    elif tf_varname == 'fc/weights':
+        return p.fc_weights('fc1000')
+
+    elif tf_varname == 'fc/biases':
+        return p.fc_biases('fc1000')
+
+    # scale2/block1/shortcut/weights
+    # scale3/block2/c/moving_mean
+    # scale3/block6/c/moving_variance
+    # scale4/block3/c/moving_mean
+    # scale4/block8/a/beta
+    re1 = 'scale(\d+)/block(\d+)/(shortcut|a|b|c)'
+    m = re.search(re1, tf_varname)
+
+    def letter(i):
+        return chr(ord('a') + i - 1)
+
+    scale_num = int(m.group(1))
+
+    block_num = int(m.group(2))
+    if scale_num == 2:
+        # scale 2 always uses block letters
+        block_str = letter(block_num)
+    elif scale_num == 3 or scale_num == 4:
+        # scale 3 uses block letters for l=50 and numbered blocks for l=101, l=151
+        # scale 4 uses block letters for l=50 and numbered blocks for l=101, l=151
+        if num_layers == 50:
+            block_str = letter(block_num)
+        else:
+            if block_num == 1:
+                block_str = 'a'
+            else:
+                block_str = 'b%d' % (block_num - 1)
+    elif scale_num == 5:
+        # scale 5 always block letters
+        block_str = letter(block_num)
+    else:
+        raise ValueError("unexpected scale_num %d" % scale_num)
+
+    branch = m.group(3)
+    if branch == "shortcut":
+        branch_num = 1
+        conv_letter = ''
+    else:
+        branch_num = 2
+        conv_letter = branch 
+
+    x = (scale_num, block_str, branch_num, conv_letter)
+    #print x
+
+    if 'weights' in tf_varname:
+        return p.conv_kernel('res%d%s_branch%d%s' % x)
+
+    if 'gamma' in tf_varname:
+        return p.bn_gamma('scale%d%s_branch%d%s' % x)
+
+    if 'beta' in tf_varname:
+        return p.bn_beta('scale%d%s_branch%d%s' % x)
+
+    if 'moving_mean' in tf_varname:
+        return p.bn_mean('bn%d%s_branch%d%s' % x)
+
+    if 'moving_variance' in tf_varname:
+        return p.bn_variance('bn%d%s_branch%d%s' % x)
+
+    raise ValueError('unhandled var ' + tf_varname)
+    
+    
+
 def convert(graph, img, img_p, layers):
-    net = load_caffe(img_p, layers)
-    param_provider = CaffeParamProvider(net)
+    caffe_model = load_caffe(img_p, layers)
+
+    #for i, n in enumerate(caffe_model.params):
+    #    print n
+
+    param_provider = CaffeParamProvider(caffe_model)
+
+    if layers == 50:
+        num_blocks=[3, 4, 6, 3]
+    elif layers == 101:
+        num_blocks=[3, 4, 23, 3]
+    elif layers == 152:
+        num_blocks=[3, 8, 36, 3]
+
     with tf.device('/cpu:0'):
         images = tf.placeholder("float32", [None, 224, 224, 3], name="images")
-        m = resnet.Model(param_provider)
-        m.build(images, layers)
+        logits = resnet.inference(images,
+                                  is_training=False,
+                                  num_blocks=num_blocks,
+                                  bottleneck=True)
+        prob = tf.nn.softmax(logits, name='prob')
+
+    vars_to_restore = tf.all_variables()
+
     sess = tf.Session()
     sess.run(tf.initialize_all_variables())
 
+    assigns = []
+    for var in vars_to_restore:
+        #print var.op.name 
+        data = parse_tf_varnames(param_provider, var.op.name, layers)
+        #print "caffe data shape", data.shape
+        #print "tf shape", var.get_shape()
+        assigns.append(var.assign(data))
+    sess.run(assigns)
+
+    #for op in tf.get_default_graph().get_operations():
+    #    print op.name
+
 
     i = [
-        graph.get_tensor_by_name("conv1/relu:0"),
-        graph.get_tensor_by_name("pool1:0"),
-        graph.get_tensor_by_name("res2a/relu:0"),
-        graph.get_tensor_by_name("res2b/relu:0"),
-        graph.get_tensor_by_name("res2c/relu:0"),
-        graph.get_tensor_by_name("res3a/relu:0"),
-        graph.get_tensor_by_name("res5c/relu:0"),
-        graph.get_tensor_by_name("pool5:0"),
+        graph.get_tensor_by_name("scale1/Relu:0"),
+        graph.get_tensor_by_name("scale2/MaxPool:0"),
+        graph.get_tensor_by_name("scale2/block1/Relu:0"),
+        graph.get_tensor_by_name("scale2/block2/Relu:0"),
+        graph.get_tensor_by_name("scale2/block3/Relu:0"),
+        graph.get_tensor_by_name("scale3/block1/Relu:0"),
+        graph.get_tensor_by_name("scale5/block3/Relu:0"),
+        graph.get_tensor_by_name("avg_pool:0"),
         graph.get_tensor_by_name("prob:0"),
     ]
 
     o = sess.run(i, {
-        images: img[np.newaxis,:]
+        images: img_p[np.newaxis,:]
     })
 
-    assert_almost_equal(net.blobs['conv1'].data, o[0])
-    assert_almost_equal(net.blobs['pool1'].data, o[1])
-    assert_almost_equal(net.blobs['res2a'].data, o[2])
-    assert_almost_equal(net.blobs['res2b'].data, o[3])
-    assert_almost_equal(net.blobs['res2c'].data, o[4])
-    assert_almost_equal(net.blobs['res3a'].data, o[5])
-    assert_almost_equal(net.blobs['res5c'].data, o[6])
-    assert_almost_equal(net.blobs['pool5'].data, o[7])
+    assert_almost_equal(caffe_model.blobs['conv1'].data, o[0])
+    assert_almost_equal(caffe_model.blobs['pool1'].data, o[1])
+    assert_almost_equal(caffe_model.blobs['res2a'].data, o[2])
+    assert_almost_equal(caffe_model.blobs['res2b'].data, o[3])
+    assert_almost_equal(caffe_model.blobs['res2c'].data, o[4])
+    assert_almost_equal(caffe_model.blobs['res3a'].data, o[5])
+    assert_almost_equal(caffe_model.blobs['res5c'].data, o[6])
+    #assert_almost_equal(np.squeeze(caffe_model.blobs['pool5'].data), o[7])
 
-    utils.print_prob(o[8][0])
+    print_prob(o[8][0])
 
-    prob_dist = np.linalg.norm(net.blobs['prob'].data - o[8])
+    prob_dist = np.linalg.norm(caffe_model.blobs['prob'].data - o[8])
     print 'prob_dist ', prob_dist
     assert prob_dist < 0.2 # XXX can this be tightened?
 
     save_graph("resnet-%d.tfmodel" % layers)
 
 def main(_):
-    img = load_image("cat.jpg")
+    img = load_image("data/cat.jpg")
     img_p = preprocess(img)
 
     for layers in [50, 101, 152]:

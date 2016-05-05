@@ -22,23 +22,23 @@ def inference(x, is_training,
                                        dtype='bool',
                                        name='is_training')
 
-    with tf.variable_scope('pre'):
+    with tf.variable_scope('scale1'):
         x = _conv(x, 64, ksize=7, stride=2)
         x = _bn(x, is_training)
         x = _relu(x)
+
+    with tf.variable_scope('scale2'):
         x = _max_pool(x, ksize=3, stride=2)
+        x = stack(x, num_blocks[0], 64, bottleneck, is_training, stride=1)
 
-    with tf.variable_scope('stack0'):
-        stack(x, num_blocks[0], 64, bottleneck, is_training)
+    with tf.variable_scope('scale3'):
+        x = stack(x, num_blocks[1], 128, bottleneck, is_training, stride=2)
 
-    with tf.variable_scope('stack1'):
-        stack(x, num_blocks[1], 128, bottleneck, is_training)
+    with tf.variable_scope('scale4'):
+        x = stack(x, num_blocks[2], 256, bottleneck, is_training, stride=2)
 
-    with tf.variable_scope('stack2'):
-        stack(x, num_blocks[2], 256, bottleneck, is_training)
-
-    with tf.variable_scope('stack3'):
-        stack(x, num_blocks[3], 512, bottleneck, is_training)
+    with tf.variable_scope('scale5'):
+        x = stack(x, num_blocks[3], 512, bottleneck, is_training, stride=2)
 
     # post-net
     x = tf.reduce_mean(x, reduction_indices=[1, 2], name="avg_pool")
@@ -71,14 +71,14 @@ def loss(logits, labels, batch_size=None, label_smoothing=0.1):
     return loss
 
 
-def stack(x, num_blocks, filters_internal, bottleneck, is_training):
+def stack(x, num_blocks, filters_internal, bottleneck, is_training, stride):
     for n in range(num_blocks):
-         stride = 2 if n == 0 else 1
-         with tf.variable_scope('block%d' % n):
+         s = stride if n == 0 else 1
+         with tf.variable_scope('block%d' % (n + 1)):
              x = block(x, filters_internal,
                        bottleneck=bottleneck,
                        is_training=is_training,
-                       stride=stride)
+                       stride=s)
     return x
 
 def block(x, filters_internal, is_training, stride, bottleneck=False):
@@ -94,39 +94,37 @@ def block(x, filters_internal, is_training, stride, bottleneck=False):
         filters_out = filters_internal
 
     shortcut = x # branch 1
-    diff = x # branch 2
+
+    if bottleneck:
+        with tf.variable_scope('a'):
+            x = _conv(x, filters_internal, ksize=1, stride=stride)
+            x = _bn(x, is_training)
+            x = _relu(x)
+
+        with tf.variable_scope('b'):
+            x = _conv(x, filters_internal, ksize=3, stride=1)
+            x = _bn(x, is_training)
+            x = _relu(x)
+
+        with tf.variable_scope('c'):
+            x = _conv(x, filters_out, ksize=1, stride=1)
+            x = _bn(x, is_training)
+    else:
+        with tf.variable_scope('a'):
+            x = _conv(x, filters_internal, ksize=3, stride=stride)
+            x = _bn(x, is_training)
+            x = _relu(x)
+
+        with tf.variable_scope('b'):
+            x = _conv(x, filters_out, ksize=3, stride=1)
+            x = _bn(x, is_training)
 
     with tf.variable_scope('shortcut'):
         if filters_out != filters_in or stride != 1:
             shortcut = _conv(shortcut, filters_out, ksize=1, stride=stride)
             shortcut = _bn(shortcut, is_training)
 
-    with tf.variable_scope('diff'):
-        if bottleneck:
-            with tf.variable_scope('A'):
-                diff = _conv(diff, filters_internal, ksize=1, stride=stride)
-                diff = _bn(diff, is_training)
-                diff = _relu(diff)
-
-            with tf.variable_scope('B'):
-                diff = _conv(diff, filters_internal, ksize=3, stride=1)
-                diff = _bn(diff, is_training)
-                diff = _relu(diff)
-
-            with tf.variable_scope('C'):
-                diff = _conv(diff, filters_out, ksize=1, stride=1)
-                diff = _bn(diff, is_training)
-        else:
-            with tf.variable_scope('A'):
-                diff = _conv(diff, filters_internal, ksize=3, stride=stride)
-                diff = _bn(diff, is_training)
-                diff = _relu(diff)
-
-            with tf.variable_scope('B'):
-                diff = _conv(diff, filters_internal, ksize=3, stride=1)
-                diff = _bn(diff, is_training)
-
-    return _relu(diff + shortcut)
+    return _relu(x + shortcut)
 
 def _relu(x):
     return tf.nn.relu(x)
@@ -146,13 +144,13 @@ def _bn(x, is_training):
     moving_mean = tf.get_variable('moving_mean',
                                   params_shape,
                                   initializer=tf.zeros_initializer,
-                                  trainable=False,
-                                  collections=moving_collections)
+                                  trainable=False)
+                                  #collections=moving_collections)
     moving_variance = tf.get_variable('moving_variance',
                                       params_shape,
                                       initializer=tf.ones_initializer,
-                                      trainable=False,
-                                      collections=moving_collections)
+                                      trainable=False)
+                                      #collections=moving_collections)
 
     # These ops will only be preformed when training.
     mean, variance = tf.nn.moments(x, axis)
@@ -203,9 +201,9 @@ def _conv(x, filters_out, ksize=3, stride=1):
     return tf.nn.conv2d(x, weights, [1, stride, stride, 1], padding='SAME')
   
         
-def _max_pool(x, ksize=3, stride=1):
+def _max_pool(x, ksize=3, stride=2):
     return tf.nn.max_pool(x, ksize=[1, ksize, ksize, 1],
-         strides=[ 1, stride, stride, 1], padding='VALID')
+         strides=[ 1, stride, stride, 1], padding='SAME')
 
 def _l2_regularizer(weight=1.0, scope=None):
     def regularizer(tensor):
