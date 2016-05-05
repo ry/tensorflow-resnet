@@ -3,3 +3,6 @@
 .ipynb_checkpoints/
 *.caffemodel
 *.tfmodel
+checkpoint
+ResNet-L*.ckpt
+ResNet-L*.ckpt.meta

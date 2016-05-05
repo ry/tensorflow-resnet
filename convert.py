@@ -5,8 +5,7 @@ import re
 import caffe
 import numpy as np
 import tensorflow as tf
-import skimage
-from skimage.io import imsave
+import skimage.io
 from caffe.proto import caffe_pb2
 from synset import *
 
@@ -80,13 +79,13 @@ def assert_almost_equal(caffe_tensor, tf_tensor):
 
 # returns image of shape [224, 224, 3]
 # [height, width, depth]
-def load_image(path):
+def load_image(path, size=224):
     img = skimage.io.imread(path)
     short_edge = min(img.shape[:2])
     yy = int((img.shape[0] - short_edge) / 2)
     xx = int((img.shape[1] - short_edge) / 2)
     crop_img = img[yy : yy + short_edge, xx : xx + short_edge]
-    resized_img = skimage.transform.resize(crop_img, (224, 224))
+    resized_img = skimage.transform.resize(crop_img, (size, size))
     return resized_img
 
 def load_mean_bgr():
@@ -130,17 +129,6 @@ def print_prob(prob):
   print "Top5: ", top5
   return top1
 
-
-def save_graph(save_path):
-    graph = tf.get_default_graph()
-    graph_def = graph.as_graph_def()
-    print "graph_def byte size", graph_def.ByteSize()
-    graph_def_s = graph_def.SerializeToString()
-
-    with open(save_path, "wb") as f:
-      f.write(graph_def_s)
-
-    print "saved model to %s" % save_path
 
 def parse_tf_varnames(p, tf_varname, num_layers):
     if tf_varname == 'scale1/weights':
@@ -225,7 +213,11 @@ def parse_tf_varnames(p, tf_varname, num_layers):
 
     raise ValueError('unhandled var ' + tf_varname)
     
-    
+def checkpoint_fn(layers):    
+    return 'ResNet-L%d.ckpt' % layers
+
+def meta_fn(layers):    
+    return checkpoint_fn(layers) + '.meta'
 
 def convert(graph, img, img_p, layers):
     caffe_model = load_caffe(img_p, layers)
@@ -250,7 +242,13 @@ def convert(graph, img, img_p, layers):
                                   bottleneck=True)
         prob = tf.nn.softmax(logits, name='prob')
 
+    # We write the metagraph first to avoid adding a bunch of
+    # assign ops that are used to set variables from caffe.
+    # The checkpoint is written to at the end.
+    tf.train.export_meta_graph(filename=meta_fn(layers))
+
     vars_to_restore = tf.all_variables()
+    saver = tf.train.Saver(vars_to_restore)
 
     sess = tf.Session()
     sess.run(tf.initialize_all_variables())
@@ -299,7 +297,21 @@ def convert(graph, img, img_p, layers):
     print 'prob_dist ', prob_dist
     assert prob_dist < 0.2 # XXX can this be tightened?
 
-    save_graph("resnet-%d.tfmodel" % layers)
+    # We've already written the metagraph to avoid a bunch of assign ops.
+    saver.save(sess, checkpoint_fn(layers), write_meta_graph=False)
+
+
+def save_graph(save_path):
+    graph = tf.get_default_graph()
+    graph_def = graph.as_graph_def()
+    print "graph_def byte size", graph_def.ByteSize()
+    graph_def_s = graph_def.SerializeToString()
+
+    with open(save_path, "wb") as f:
+      f.write(graph_def_s)
+
+    print "saved model to %s" % save_path
+
 
 def main(_):
     img = load_image("data/cat.jpg")
