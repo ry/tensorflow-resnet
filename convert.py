@@ -157,7 +157,7 @@ def parse_tf_varnames(p, tf_varname, num_layers):
     # scale3/block6/c/moving_variance
     # scale4/block3/c/moving_mean
     # scale4/block8/a/beta
-    re1 = 'scale(\d+)/block(\d+)/(shortcut|a|b|c)'
+    re1 = 'scale(\d+)/block(\d+)/(shortcut|a|b|c|A|B)'
     m = re.search(re1, tf_varname)
 
     def letter(i):
@@ -191,7 +191,7 @@ def parse_tf_varnames(p, tf_varname, num_layers):
         conv_letter = ''
     else:
         branch_num = 2
-        conv_letter = branch 
+        conv_letter = branch.lower()
 
     x = (scale_num, block_str, branch_num, conv_letter)
     #print x

@@ -11,13 +11,13 @@ CONV_WEIGHT_STDDEV = 0.1
 CONV_WEIGHT_DECAY = 0.00004
 BN_DECAY = 0.9997
 BN_EPSILON = 0.001
-VARIABLES_TO_RESTORE = '_variables_to_restore_'
-UPDATE_OPS_COLLECTION = '_update_ops_'
+RESNET_VARIABLES = 'resnet_variables'
+UPDATE_OPS_COLLECTION = 'resnet_update_ops' # must be grouped with training op
 
 def inference(x, is_training,
               num_classes=1000,
               num_blocks=[2, 2, 2, 2],  # defaults to 18-layer network
-              bottleneck=False):
+              bottleneck=True):
     is_training = tf.convert_to_tensor(is_training,
                                        dtype='bool',
                                        name='is_training')
@@ -81,7 +81,7 @@ def stack(x, num_blocks, filters_internal, bottleneck, is_training, stride):
                        stride=s)
     return x
 
-def block(x, filters_internal, is_training, stride, bottleneck=False):
+def block(x, filters_internal, is_training, stride, bottleneck):
     filters_in = x.get_shape()[-1]
 
     # Note: filters_out isn't how many filters are outputed. 
@@ -110,12 +110,12 @@ def block(x, filters_internal, is_training, stride, bottleneck=False):
             x = _conv(x, filters_out, ksize=1, stride=1)
             x = _bn(x, is_training)
     else:
-        with tf.variable_scope('a'):
+        with tf.variable_scope('A'):
             x = _conv(x, filters_internal, ksize=3, stride=stride)
             x = _bn(x, is_training)
             x = _relu(x)
 
-        with tf.variable_scope('b'):
+        with tf.variable_scope('B'):
             x = _conv(x, filters_out, ksize=3, stride=1)
             x = _bn(x, is_training)
 
@@ -134,23 +134,17 @@ def _bn(x, is_training):
     params_shape = x_shape[-1:]
     axis = list(range(len(x_shape) - 1))
 
-    beta = tf.get_variable('beta', params_shape,
-                           initializer=tf.zeros_initializer)
-    gamma = tf.get_variable('gamma', params_shape,
-                           initializer=tf.ones_initializer)
+    beta = _get_variable('beta', params_shape, initializer=tf.zeros_initializer)
+    gamma = _get_variable('gamma', params_shape, initializer=tf.ones_initializer)
 
-    moving_collections = [ tf.GraphKeys.MOVING_AVERAGE_VARIABLES ]
-
-    moving_mean = tf.get_variable('moving_mean',
-                                  params_shape,
-                                  initializer=tf.zeros_initializer,
-                                  trainable=False)
-                                  #collections=moving_collections)
-    moving_variance = tf.get_variable('moving_variance',
-                                      params_shape,
-                                      initializer=tf.ones_initializer,
-                                      trainable=False)
-                                      #collections=moving_collections)
+    moving_mean = _get_variable('moving_mean',
+                                params_shape,
+                                initializer=tf.zeros_initializer,
+                                trainable=False)
+    moving_variance = _get_variable('moving_variance',
+                                    params_shape,
+                                    initializer=tf.ones_initializer,
+                                    trainable=False)
 
     # These ops will only be preformed when training.
     mean, variance = tf.nn.moments(x, axis)
@@ -173,47 +167,42 @@ def _bn(x, is_training):
 
 def _fc(x, num_units_out):
     num_units_in = x.get_shape()[1]
-
-    weights_shape = [num_units_in, num_units_out] 
     weights_initializer = tf.truncated_normal_initializer(stddev=FC_WEIGHT_STDDEV)
-    weights_regularizer = _l2_regularizer(FC_WEIGHT_DECAY)
 
-    weights = tf.get_variable('weights',
-                              shape=weights_shape,
-                              initializer=weights_initializer,
-                              regularizer=weights_regularizer)
-    biases = tf.get_variable('biases',
-                             shape=[num_units_out],
-                             initializer=tf.zeros_initializer)
+    weights = _get_variable('weights',
+                            shape=[num_units_in, num_units_out],
+                            initializer=weights_initializer,
+                            weight_decay=FC_WEIGHT_STDDEV)
+    biases = _get_variable('biases', shape=[num_units_out],
+                           initializer=tf.zeros_initializer)
     x = tf.nn.xw_plus_b(x, weights, biases)
     return x
-        
+
+def _get_variable(name, shape, initializer, weight_decay=0.0, dtype='float', trainable=True):
+    "A little wrapper around tf.get_variable to do weight decay and add to"
+    "resnet collection"
+    if weight_decay > 0:
+        regularizer = tf.contrib.layers.l2_regularizer(weight_decay)
+    else:
+        regularizer = None
+    collections = [ tf.GraphKeys.VARIABLES, RESNET_VARIABLES ]
+    return tf.get_variable(name, shape=shape, initializer=initializer, dtype=dtype,
+                           regularizer=regularizer, collections=collections,
+                           trainable=trainable)
 
 def _conv(x, filters_out, ksize=3, stride=1):
     filters_in = x.get_shape()[-1]
     shape = [ksize, ksize, filters_in, filters_out]
     initializer = tf.truncated_normal_initializer(stddev=CONV_WEIGHT_STDDEV)
-    regularizer = _l2_regularizer(CONV_WEIGHT_DECAY)
-    #collections=[VARIABLES_TO_RESTORE] 
-    weights = tf.get_variable('weights', shape=shape, dtype='float',
-                              initializer=initializer,
-                              regularizer=regularizer)
+    weights = _get_variable('weights', shape=shape, dtype='float',
+                            initializer=initializer,
+                            weight_decay=CONV_WEIGHT_DECAY)
     return tf.nn.conv2d(x, weights, [1, stride, stride, 1], padding='SAME')
   
         
 def _max_pool(x, ksize=3, stride=2):
     return tf.nn.max_pool(x, ksize=[1, ksize, ksize, 1],
          strides=[ 1, stride, stride, 1], padding='SAME')
-
-def _l2_regularizer(weight=1.0, scope=None):
-    def regularizer(tensor):
-        with tf.op_scope([tensor], scope, 'L2Regularizer'):
-            l2_weight = tf.convert_to_tensor(weight,
-                                             dtype=tensor.dtype.base_dtype,
-                                             name='weight')
-            return tf.mul(l2_weight, tf.nn.l2_loss(tensor), name='value')
-    return regularizer
-
 
 def preprocess(self, rgb):
     rgb_scaled = rgb * 255.0
