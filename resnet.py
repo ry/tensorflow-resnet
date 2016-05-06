@@ -22,7 +22,7 @@ MEAN_BGR = [
 
 def inference(x, is_training,
               num_classes=1000,
-              num_blocks=[2, 2, 2, 2],  # defaults to 18-layer network
+              num_blocks=[3, 4, 6, 3],  # defaults to 50-layer network
               preprocess=True,
               bottleneck=True):
     # if preprocess is True, input should be RGB [0,1], otherwise BGR with mean
