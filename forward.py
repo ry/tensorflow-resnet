@@ -1,10 +1,9 @@
-from convert import print_prob, load_image, preprocess, checkpoint_fn, meta_fn
+from convert import print_prob, load_image, checkpoint_fn, meta_fn
 import tensorflow as tf
 
 layers = 50
 
 img = load_image("data/cat.jpg")
-img_p = preprocess(img)
 
 sess = tf.Session()
 
@@ -21,7 +20,7 @@ for op in graph.get_operations():
 #sess.run(init)
 print "graph restored"
 
-batch = img_p.reshape((1, 224, 224, 3))
+batch = img.reshape((1, 224, 224, 3))
 
 feed_dict = { images: batch }
 

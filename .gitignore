@@ -5,4 +5,4 @@
 *.tfmodel
 checkpoint
 ResNet-L*.ckpt
-ResNet-L*.ckpt.meta
+ResNet-L*.meta

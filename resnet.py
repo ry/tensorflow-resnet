@@ -13,11 +13,23 @@ BN_DECAY = 0.9997
 BN_EPSILON = 0.001
 RESNET_VARIABLES = 'resnet_variables'
 UPDATE_OPS_COLLECTION = 'resnet_update_ops' # must be grouped with training op
+MEAN_BGR = [
+    103.062623801, 
+    115.902882574,
+    123.151630838,
+]
+
 
 def inference(x, is_training,
               num_classes=1000,
               num_blocks=[2, 2, 2, 2],  # defaults to 18-layer network
+              preprocess=True,
               bottleneck=True):
+    # if preprocess is True, input should be RGB [0,1], otherwise BGR with mean
+    # subtracted
+    if preprocess:
+        x = _preprocess(x)
+
     is_training = tf.convert_to_tensor(is_training,
                                        dtype='bool',
                                        name='is_training')
@@ -46,6 +58,13 @@ def inference(x, is_training,
         logits = _fc(x, num_units_out=num_classes)
 
     return logits
+
+def _preprocess(rgb):
+    """Changes RGB [0,1] valued image to BGR [0,255] with mean subtracted."""
+    red, green, blue = tf.split(3, 3, rgb * 255.0) 
+    bgr = tf.concat(3, [blue, green, red])
+    bgr -= MEAN_BGR
+    return bgr
 
 def loss(logits, labels, batch_size=None, label_smoothing=0.1):
     if not batch_size:
@@ -204,24 +223,4 @@ def _max_pool(x, ksize=3, stride=2):
     return tf.nn.max_pool(x, ksize=[1, ksize, ksize, 1],
          strides=[ 1, stride, stride, 1], padding='SAME')
 
-def preprocess(self, rgb):
-    rgb_scaled = rgb * 255.0
-
-    red, green, blue = tf.split(3, 3, rgb_scaled)
-
-    mean_bgr = self.param_provider.mean_bgr()
-
-    # resize mean_bgr to match input
-    input_width = rgb.get_shape().as_list()[2]
-    mean_bgr = tf.image.resize_bilinear(mean_bgr, [input_width, input_width])
-
-    mean_blue, mean_green, mean_red = tf.split(3, 3, mean_bgr)
-
-    bgr = tf.concat(3, [
-        blue - mean_blue,
-        green - mean_green,
-        red - mean_red,
-    ], name="centered_bgr")
-
-    return bgr
 

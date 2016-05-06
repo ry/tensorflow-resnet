@@ -16,10 +16,6 @@ class CaffeParamProvider():
     def __init__(self, caffe_net):
         self.caffe_net = caffe_net
 
-    def mean_bgr(self):
-        mean_bgr = load_mean_bgr()
-        return mean_bgr.reshape((1, 224, 224, 3))
-
     def conv_kernel(self, name):
         k =  self.caffe_net.params[name][0].data
         # caffe      [out_channels, in_channels, filter_height, filter_width] 
@@ -55,6 +51,9 @@ class CaffeParamProvider():
 def preprocess(img):
     """Changes RGB [0,1] valued image to BGR [0,255] with mean subtracted."""
     mean_bgr = load_mean_bgr()
+    print 'mean blue', np.mean(mean_bgr[:,:,0])
+    print 'mean green', np.mean(mean_bgr[:,:,1])
+    print 'mean red', np.mean(mean_bgr[:,:,2])
     out = np.copy(img) * 255.0
     out = out[:, :, [2,1,0]] # swap channel from RGB to BGR
     out -= mean_bgr
@@ -217,7 +216,7 @@ def checkpoint_fn(layers):
     return 'ResNet-L%d.ckpt' % layers
 
 def meta_fn(layers):    
-    return checkpoint_fn(layers) + '.meta'
+    return 'ResNet-L%d.meta' % layers
 
 def convert(graph, img, img_p, layers):
     caffe_model = load_caffe(img_p, layers)
@@ -239,6 +238,7 @@ def convert(graph, img, img_p, layers):
         logits = resnet.inference(images,
                                   is_training=False,
                                   num_blocks=num_blocks,
+                                  preprocess=True,
                                   bottleneck=True)
         prob = tf.nn.softmax(logits, name='prob')
 
@@ -279,7 +279,7 @@ def convert(graph, img, img_p, layers):
     ]
 
     o = sess.run(i, {
-        images: img_p[np.newaxis,:]
+        images: img[np.newaxis,:]
     })
 
     assert_almost_equal(caffe_model.blobs['conv1'].data, o[0])
@@ -315,6 +315,7 @@ def save_graph(save_path):
 
 def main(_):
     img = load_image("data/cat.jpg")
+    print img
     img_p = preprocess(img)
 
     for layers in [50, 101, 152]:
