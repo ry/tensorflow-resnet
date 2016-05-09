@@ -1,46 +1,35 @@
-# Pre-trained ResNet Models in TensorFlow
+# ResNet Model in TensorFlow
 
-ResNet was the winner of ILSVRC 2015. It's currently (2/2016) the most accurate
-image classification model.
+This is the second version of my ResNet implementation.
 
-The authors of ResNet have
-[published](https://github.com/KaimingHe/deep-residual-networks) pre-trained
-models for Caffe. This is a script to convert those exact models for use in
-TensorFlow.
+## Goals
 
-Running the conversion script, of course, depends on both Caffe and TensorFlow
-both being installed.  You will also need to downlaod the Caffe pretrained
-models from [here](https://github.com/KaimingHe/deep-residual-networks).
-Running the converted model only depends on TensorFlow.
+* Be able to use the pre-trained model's that [Kaiming He has provided for
+  Caffe](https://github.com/KaimingHe/deep-residual-networks). The `convert.py`
+  will convert the weights for use with TensorFlow.
 
-Note this code depends on [TensorFlow git commit
-cf7ce8](https://github.com/tensorflow/tensorflow/commit/cf7ce8a7879b6a7ba90441724ea3f8353917a515)
-or later. TF 0.8 is not new enough.
+* Implemented in the style of
+  [Inception](https://github.com/tensorflow/models/tree/master/inception/inception)
+  not using any classes and making heavy use of variable scope. It should be
+  easily usable in other models.
 
-The forward.py script shows how to use it.
+* Expierment with changes to ResNet like [stochastic
+  depth](https://arxiv.org/abs/1603.09382), [shared weights at each
+  scale](https://arxiv.org/abs/1604.03640), and 1D convolutions for audio.
+
+* ResNet is fully convolutional and the implementation should allow inputs to
+  be any size.
 
 ## Notes
 
-* The convert.py script checks that activations are similiar to the caffe version
-  but it's not exactly the same. This is because TensorFlow handles padding slightly
-  differentl.
+* This code depends on [TensorFlow git commit
+  cf7ce8](https://github.com/tensorflow/tensorflow/commit/cf7ce8a7879b6a7ba90441724ea3f8353917a515)
+  or later because ResNet needs 1x1 convolutions with stride 2. TF 0.8 is not new
+  enough.
 
-* Resnet is full convolutional. You can resize the network input down to 65x65 images.
+* The `convert.py` script checks that activations are similiar to the caffe version
+  but it's not exactly the same. This is probably due to differences between how
+  TF and Caffe handle padding. Also preprocessing is done with color-channel means 
+  instead of pixel-wise means.
 
-## Error Rates
-
-Unfortunately, it runs less accurately than the published error rates for
-Caffe - I suspect it's due to the padding algorithms being slightly different.
-Maybe fine-tuning will help. Use `test_error_rate.py` to check:
-
-  model | top-1 | top-5
-  :---: | :---: | :---:
-  Caffe VGG-16 | 28.5% | 9.9%
-  **TF ResNet-50** | 27.4% | 9.0%
-  **TF ResNet-101** | 26.1% | 8.1%
-  Caffe ResNet-50 | 24.7% | 7.8%
-  **TF ResNet-152** | 25.2% | 7.2%
-  Caffe ResNet-101 | 23.6% | 7.1%
-  Caffe ResNet-152 | 23.0% | 6.7%
-
-
+* ResNet is full convolutional. You can resize the network input down to 65x65 images.
