@@ -14,7 +14,7 @@ BN_DECAY = MOVING_AVERAGE_DECAY
 BN_EPSILON = 0.001
 RESNET_VARIABLES = 'resnet_variables'
 UPDATE_OPS_COLLECTION = 'resnet_update_ops' # must be grouped with training op
-MEAN_BGR = [
+IMAGENET_MEAN_BGR = [
     103.062623801, 
     115.902882574,
     123.151630838,
@@ -29,7 +29,7 @@ def inference(x, is_training,
     # if preprocess is True, input should be RGB [0,1], otherwise BGR with mean
     # subtracted
     if preprocess:
-        x = _preprocess(x)
+        x = _imagenet_preprocess(x)
 
     is_training = tf.convert_to_tensor(is_training,
                                        dtype='bool',
@@ -60,11 +60,48 @@ def inference(x, is_training,
 
     return logits
 
-def _preprocess(rgb):
+# This is what they use for CIFAR-10 and 100.
+# See Section 4.2 in http://arxiv.org/abs/1512.03385
+def inference_small(x,
+                    is_training,
+                    num_classes=10,
+                    num_blocks=3, # 6n+2 total weight layers will be used.
+                    preprocess=True):
+    # if preprocess is True, input should be RGB [0,1], otherwise BGR with mean
+    # subtracted
+    if preprocess:
+        x = _imagenet_preprocess(x)
+
+    bottleneck = False
+    is_training = tf.convert_to_tensor(is_training,
+                                       dtype='bool',
+                                       name='is_training')
+
+    with tf.variable_scope('scale1'):
+        x = _conv(x, 16, ksize=3, stride=1)
+        x = _bn(x, is_training)
+        x = _relu(x)
+
+        x = stack(x, num_blocks, 16, bottleneck, is_training, stride=1)
+
+    with tf.variable_scope('scale2'):
+        x = stack(x, num_blocks, 32, bottleneck, is_training, stride=2)
+
+    with tf.variable_scope('scale3'):
+        x = stack(x, num_blocks, 64, bottleneck, is_training, stride=2)
+
+    # post-net
+    x = tf.reduce_mean(x, reduction_indices=[1, 2], name="avg_pool")
+    with tf.variable_scope('fc'):
+        logits = _fc(x, num_units_out=num_classes)
+
+    return logits
+
+def _imagenet_preprocess(rgb):
     """Changes RGB [0,1] valued image to BGR [0,255] with mean subtracted."""
     red, green, blue = tf.split(3, 3, rgb * 255.0) 
     bgr = tf.concat(3, [blue, green, red])
-    bgr -= MEAN_BGR
+    bgr -= IMAGENET_MEAN_BGR
     return bgr
 
 def loss(logits, labels, batch_size=None, label_smoothing=0.1):

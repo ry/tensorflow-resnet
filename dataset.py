@@ -18,13 +18,13 @@ class DataSet:
         self.index = 0
         self.epochs_completed += 1
 
-    def get_batch(self, batch_size):
+    def get_batch(self, batch_size, input_size):
         imgs = []
         labels = []
         while len(imgs) < batch_size:
             try:
                 fn = self.data[self.index]['filename']
-                img = load_image(fn)
+                img = load_image(fn, input_size)
                 imgs.append(img)
                 labels.append(self.data[self.index]['label_index'])
                 self.index += 1
@@ -35,7 +35,7 @@ class DataSet:
                 del self.data[self.index]
 
         batch_images = np.stack(imgs)
-        assert batch_images.shape == (batch_size, 224, 224, 3)
+        assert batch_images.shape == (batch_size, input_size, input_size, 3)
 
         batch_labels = np.asarray(labels).reshape((batch_size, 1))
         assert batch_labels.shape == (batch_size, 1)
@@ -83,30 +83,23 @@ def load_data(data_dir):
     return data
 
 
-# Returns a numpy array of shape [height, width, 3]
-def load_image(path):
-    # load image
+# Returns a numpy array of shape [size, size, 3]
+def load_image(path, size):
     img = skimage.io.imread(path)
 
-    #print "Original Image Shape: ", img.shape
-    # we crop image from center
     short_edge = min(img.shape[:2])
     yy = int((img.shape[0] - short_edge) / 2)
     xx = int((img.shape[1] - short_edge) / 2)
     crop_img = img[yy : yy + short_edge, xx : xx + short_edge]
-    # resize to 224, 224
 
-    img = skimage.transform.resize(crop_img, (224, 224))
-
-    #print img
-    #img = img / 255.0
+    img = skimage.transform.resize(crop_img, (size, size))
 
     # if it's a black and white photo, we need to change it to 3 channel
     # or raise an error if we're not allowing b&w (which we do during training)
     if len(img.shape) == 2:
         img = np.stack([img, img, img], axis=-1)
 
-    assert img.shape == (224, 224, 3)
+    assert img.shape == (size, size, 3)
     assert (0 <= img).all() and (img <= 1.0).all()
 
     return img
