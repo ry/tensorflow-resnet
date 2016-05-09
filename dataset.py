@@ -4,6 +4,7 @@ import os
 import re
 import numpy as np
 import skimage.io
+import skimage.transform
 
 class DataSet:
     def __init__(self, data_dir):
@@ -36,8 +37,8 @@ class DataSet:
         batch_images = np.stack(imgs)
         assert batch_images.shape == (batch_size, 224, 224, 3)
 
-        batch_labels = np.asarray(lables)
-        assert batch_labels.shape == (batch_size, )
+        batch_labels = np.asarray(labels).reshape((batch_size, 1))
+        assert batch_labels.shape == (batch_size, 1)
 
         return batch_images, batch_labels
 
@@ -87,9 +88,6 @@ def load_image(path):
     # load image
     img = skimage.io.imread(path)
 
-    img = img / 255.0
-    assert (0 <= img).all() and (img <= 1.0).all()
-
     #print "Original Image Shape: ", img.shape
     # we crop image from center
     short_edge = min(img.shape[:2])
@@ -100,11 +98,15 @@ def load_image(path):
 
     img = skimage.transform.resize(crop_img, (224, 224))
 
+    #print img
+    #img = img / 255.0
+
     # if it's a black and white photo, we need to change it to 3 channel
     # or raise an error if we're not allowing b&w (which we do during training)
     if len(img.shape) == 2:
         img = np.stack([img, img, img], axis=-1)
 
     assert img.shape == (224, 224, 3)
+    assert (0 <= img).all() and (img <= 1.0).all()
 
     return img

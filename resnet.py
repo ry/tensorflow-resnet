@@ -86,7 +86,8 @@ def loss(logits, labels, batch_size=None, label_smoothing=0.1):
       smooth_negatives = label_smoothing / num_classes
       one_hot_labels = one_hot_labels * smooth_positives + smooth_negatives
 
-    loss =  tf.nn.softmax_cross_entropy_with_logits(logits, one_hot_labels)
+    loss = tf.nn.softmax_cross_entropy_with_logits(logits, one_hot_labels)
+    loss = tf.reduce_mean(loss)
     return loss
 
 
