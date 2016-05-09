@@ -1,10 +1,17 @@
-from synset import *
+import skimage.io # bug. need to import this before tensorflow
+import skimage.transform
+import tensorflow as tf
 import time
 import os
 import re
 import numpy as np
-import skimage.io
-import skimage.transform
+
+from synset import *
+import resnet
+
+FLAGS = tf.app.flags.FLAGS
+tf.app.flags.DEFINE_string('data_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_img_train',
+                           'imagenet dir')
 
 class DataSet:
     def __init__(self, data_dir):
@@ -103,3 +110,11 @@ def load_image(path, size):
     assert (0 <= img).all() and (img <= 1.0).all()
 
     return img
+
+
+def main(_):
+    dataset = DataSet(FLAGS.data_dir)
+    resnet.train(dataset)
+
+if __name__ == '__main__':
+    tf.app.run()
