@@ -20,6 +20,13 @@ This is the second version of my ResNet implementation.
 * ResNet is fully convolutional and the implementation should allow inputs to
   be any size.
 
+## Pretrained Model
+
+Instead of running `convert.py`, which depends on Caffe, you can download the converted model thru BitTorrent:
+
+[tensorflow-resnet-pretrained-20160509.tar.gz.torrent](https://raw.githubusercontent.com/ry/tensorflow-resnet/master/data/tensorflow-resnet-pretrained-20160509.tar.gz.torrent)  464M
+
+
 ## Notes
 
 * This code depends on [TensorFlow git commit
