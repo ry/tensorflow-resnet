@@ -1,5 +1,6 @@
 import skimage.io # bug. need to import this before tensorflow
 import tensorflow as tf
+from tensorflow.python.training import moving_averages
 import resnet
 from dataset import DataSet
 import time
@@ -17,6 +18,7 @@ tf.app.flags.DEFINE_string('train_dir', '/tmp/resnet_train',
                            """and checkpoint.""")
 tf.app.flags.DEFINE_float('learning_rate', 0.1, "learning rate.")
 tf.app.flags.DEFINE_integer('batch_size', 16, "batch size")
+tf.app.flags.DEFINE_boolean('continue', False, 'resume from latest saved state')
 
 
 def train(dataset):
@@ -33,10 +35,17 @@ def train(dataset):
                               num_classes=1000,
                               is_training=True,
                               preprocess=True,
-                              num_blocks=[2, 2, 2, 2])
+                              bottleneck=False,
+                              num_blocks=[2,2,2,2])
 
     loss = resnet.loss(logits, labels, batch_size=FLAGS.batch_size)
     tf.scalar_summary('loss', loss)
+    tf.scalar_summary('learning_rate', FLAGS.learning_rate)
+
+    ema = tf.train.ExponentialMovingAverage(resnet.MOVING_AVERAGE_DECAY, global_step)
+    tf.add_to_collection(resnet.UPDATE_OPS_COLLECTION, ema.apply([loss]))
+    loss_avg = ema.average(loss)
+    tf.scalar_summary('loss_avg', loss_avg)
 
     opt = tf.train.MomentumOptimizer(FLAGS.learning_rate, MOMENTUM)
     grads = opt.compute_gradients(loss)
@@ -60,8 +69,16 @@ def train(dataset):
 
     sess = tf.Session(config=tf.ConfigProto(log_device_placement=False))
     sess.run(init)
-    
+
     summary_writer = tf.train.SummaryWriter(FLAGS.train_dir, sess.graph)
+
+    if FLAGS.__getattr__('continue'):
+        latest = tf.train.latest_checkpoint(FLAGS.train_dir)
+        if not latest:
+            print "No checkpoint to continue from in", FLAGS.train_dir
+            sys.exit(1)
+        print "continue", latest
+        saver.restore(sess, latest)
 
     while True: 
         start_time = time.time()

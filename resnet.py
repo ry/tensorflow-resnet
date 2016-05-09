@@ -5,11 +5,12 @@ import numpy as np
 
 FLAGS = tf.app.flags.FLAGS
 
+MOVING_AVERAGE_DECAY = 0.9997
 FC_WEIGHT_STDDEV = 0.01
 FC_WEIGHT_DECAY = 0.00004
 CONV_WEIGHT_STDDEV = 0.1
 CONV_WEIGHT_DECAY = 0.00004
-BN_DECAY = 0.9997
+BN_DECAY = MOVING_AVERAGE_DECAY
 BN_EPSILON = 0.001
 RESNET_VARIABLES = 'resnet_variables'
 UPDATE_OPS_COLLECTION = 'resnet_update_ops' # must be grouped with training op
