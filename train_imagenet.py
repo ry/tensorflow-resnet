@@ -1,53 +1,36 @@
-import skimage.io # bug. need to import this before tensorflow
-import skimage.transform
+import skimage.io  # bug. need to import this before tensorflow
+import skimage.transform  # bug. need to import this before tensorflow
+import resnet
 import tensorflow as tf
 import time
 import os
+import sys
 import re
 import numpy as np
 
 from synset import *
-import resnet
+from image_processing import distorted_inputs
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('data_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_img_train',
+tf.app.flags.DEFINE_string('data_dir', '/home/ryan/data/imagenet-tf-records/',
                            'imagenet dir')
+
 
 class DataSet:
     def __init__(self, data_dir):
-        self.data = load_data(data_dir)
-        np.random.shuffle(self.data)
-        self.index = 0
-        self.epochs_completed = 0
+        self.subset = 'train'
 
-    def epoch_complete(self, batch_size):
-        np.random.shuffle(self.data)
-        self.index = 0
-        self.epochs_completed += 1
+    def reader(self):
+        return tf.TFRecordReader()
 
-    def get_batch(self, batch_size, input_size):
-        imgs = []
-        labels = []
-        while len(imgs) < batch_size:
-            try:
-                fn = self.data[self.index]['filename']
-                img = load_image(fn, input_size)
-                imgs.append(img)
-                labels.append(self.data[self.index]['label_index'])
-                self.index += 1
-                if self.index >= len(self.data):
-                    self.epoch_complete()
-
-            except ValueError:
-                del self.data[self.index]
-
-        batch_images = np.stack(imgs)
-        assert batch_images.shape == (batch_size, input_size, input_size, 3)
-
-        batch_labels = np.asarray(labels).reshape((batch_size, 1))
-        assert batch_labels.shape == (batch_size, 1)
-
-        return batch_images, batch_labels
+    def data_files(self):
+        tf_record_pattern = os.path.join(FLAGS.data_dir, '%s-*' % self.subset)
+        data_files = tf.gfile.Glob(tf_record_pattern)
+        if not data_files:
+            print('No files found for dataset %s/%s at %s' %
+                  (self.name, self.subset, FLAGS.data_dir))
+            sys.exit(-1)
+        return data_files
 
 
 def file_list(data_dir):
@@ -60,6 +43,7 @@ def file_list(data_dir):
             fn = os.path.join(data_dir, line)
             filenames.append(fn)
     return filenames
+
 
 def load_data(data_dir):
     data = []
@@ -97,7 +81,7 @@ def load_image(path, size):
     short_edge = min(img.shape[:2])
     yy = int((img.shape[0] - short_edge) / 2)
     xx = int((img.shape[1] - short_edge) / 2)
-    crop_img = img[yy : yy + short_edge, xx : xx + short_edge]
+    crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
 
     img = skimage.transform.resize(crop_img, (size, size))
 
@@ -114,7 +98,9 @@ def load_image(path, size):
 
 def main(_):
     dataset = DataSet(FLAGS.data_dir)
-    resnet.train(dataset)
+    images, labels = distorted_inputs(dataset, FLAGS.batch_size)
+    resnet.train(images, labels)
+
 
 if __name__ == '__main__':
     tf.app.run()

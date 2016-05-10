@@ -22,10 +22,8 @@ print "graph restored"
 
 batch = img.reshape((1, 224, 224, 3))
 
-feed_dict = { images: batch }
+feed_dict = {images: batch}
 
 prob = sess.run(prob_tensor, feed_dict=feed_dict)
 
 print_prob(prob[0])
-
-

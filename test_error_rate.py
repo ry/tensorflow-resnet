@@ -12,12 +12,18 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer('batch_size', 8, 'Batch size')
 flags.DEFINE_integer('max', 100000, 'max images to test')
 flags.DEFINE_integer('crop_size', 224, 'crop size')
-flags.DEFINE_integer('resize_size', 256, 'short edge of image is resized to this')
+flags.DEFINE_integer('resize_size', 256,
+                     'short edge of image is resized to this')
 flags.DEFINE_boolean('debug', False, 'Print network output')
 
-flags.DEFINE_string('xml_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_bbox_val_v3_CLS_LOC/val', 'dir with CLS-LOC xml files')
-flags.DEFINE_string('data_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_img_val', 'data dir with images')
+flags.DEFINE_string(
+    'xml_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_bbox_val_v3_CLS_LOC/val',
+    'dir with CLS-LOC xml files')
+flags.DEFINE_string('data_dir',
+                    '/home/ryan/data/ILSVRC2012/ILSVRC2012_img_val',
+                    'data dir with images')
 flags.DEFINE_string('model', 'resnet-101.tfmodel', 'model file to test')
+
 
 def load_image(path, crop_size=224, resize_size=256):
     img = skimage.io.imread(path)
@@ -28,8 +34,7 @@ def load_image(path, crop_size=224, resize_size=256):
 
     yy = int((img.shape[0] - crop_size) / 2)
     xx = int((img.shape[1] - crop_size) / 2)
-    img = img[yy : yy + crop_size, xx : xx + crop_size]
-
+    img = img[yy:yy + crop_size, xx:xx + crop_size]
 
     if len(img.shape) == 2:
         # if it's a black and white photo, we need to change it to 3 channel
@@ -60,6 +65,7 @@ def load_image(path, crop_size=224, resize_size=256):
 #
 #    return img
 
+
 def get_label(img_fn):
     base = os.path.splitext(img_fn)[0]
 
@@ -74,6 +80,7 @@ def get_label(img_fn):
     #print label_name
 
     return label_name
+
 
 def load_data():
     data = []
@@ -98,6 +105,7 @@ def load_data():
 
     return data
 
+
 def main(_):
     data = load_data()
     np.random.shuffle(data)
@@ -108,9 +116,10 @@ def main(_):
     graph_def = tf.GraphDef()
     graph_def.ParseFromString(fileContent)
 
-    images = tf.placeholder("float", [None, FLAGS.crop_size, FLAGS.crop_size, 3])
+    images = tf.placeholder("float", [None, FLAGS.crop_size, FLAGS.crop_size, 3
+                                      ])
 
-    tf.import_graph_def(graph_def, input_map={ "images": images })
+    tf.import_graph_def(graph_def, input_map={"images": images})
     print "graph loaded from disk"
 
     graph = tf.get_default_graph()
@@ -129,12 +138,14 @@ def main(_):
 
         data_batch = data[total:FLAGS.batch_size + total]
 
-        imgs = [ load_image(d['filename'], FLAGS.crop_size, FLAGS.resize_size) for d in data_batch ]
+        imgs = [load_image(d['filename'], FLAGS.crop_size, FLAGS.resize_size)
+                for d in data_batch]
         #fns = [ d['filename'] for d in data_batch ]
         #print fns
         batch = np.stack(imgs)
-        assert batch.shape == (FLAGS.batch_size, FLAGS.crop_size, FLAGS.crop_size, 3)
-        feed_dict = { images: batch }
+        assert batch.shape == (FLAGS.batch_size, FLAGS.crop_size,
+                               FLAGS.crop_size, 3)
+        feed_dict = {images: batch}
 
         prob = sess.run(prob_tensor, feed_dict=feed_dict)
 
@@ -162,7 +173,7 @@ def main(_):
         duration = time.time() - start_time
         duration_per_img = duration / FLAGS.batch_size
         print('%d top5 = %.1f%% top1 = %.1f%% (%.1f s, %.1f s/img)' %
-            (total, top5_error, top1_error, duration, duration_per_img))
+              (total, top5_error, top1_error, duration, duration_per_img))
 
 
 if __name__ == '__main__':

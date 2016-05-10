@@ -17,7 +17,7 @@ class CaffeParamProvider():
         self.caffe_net = caffe_net
 
     def conv_kernel(self, name):
-        k =  self.caffe_net.params[name][0].data
+        k = self.caffe_net.params[name][0].data
         # caffe      [out_channels, in_channels, filter_height, filter_width] 
         #             0             1            2              3
         # tensorflow [filter_height, filter_width, in_channels, out_channels]
@@ -39,7 +39,7 @@ class CaffeParamProvider():
 
     def fc_weights(self, name):
         w = self.caffe_net.params[name][0].data
-        w = w.transpose((1,0))
+        w = w.transpose((1, 0))
         return w
 
     def fc_biases(self, name):
@@ -47,21 +47,21 @@ class CaffeParamProvider():
         return b
 
 
-
 def preprocess(img):
     """Changes RGB [0,1] valued image to BGR [0,255] with mean subtracted."""
     mean_bgr = load_mean_bgr()
-    print 'mean blue', np.mean(mean_bgr[:,:,0])
-    print 'mean green', np.mean(mean_bgr[:,:,1])
-    print 'mean red', np.mean(mean_bgr[:,:,2])
+    print 'mean blue', np.mean(mean_bgr[:, :, 0])
+    print 'mean green', np.mean(mean_bgr[:, :, 1])
+    print 'mean red', np.mean(mean_bgr[:, :, 2])
     out = np.copy(img) * 255.0
-    out = out[:, :, [2,1,0]] # swap channel from RGB to BGR
+    out = out[:, :, [2, 1, 0]]  # swap channel from RGB to BGR
     out -= mean_bgr
     return out
 
+
 def assert_almost_equal(caffe_tensor, tf_tensor):
     t = tf_tensor[0]
-    c = caffe_tensor[0].transpose((1,2,0))
+    c = caffe_tensor[0].transpose((1, 2, 0))
 
     #for i in range(0, t.shape[-1]):
     #    print "tf", i,  t[:,i]
@@ -76,6 +76,7 @@ def assert_almost_equal(caffe_tensor, tf_tensor):
     print "d", d
     assert d < 500
 
+
 # returns image of shape [224, 224, 3]
 # [height, width, depth]
 def load_image(path, size=224):
@@ -83,9 +84,10 @@ def load_image(path, size=224):
     short_edge = min(img.shape[:2])
     yy = int((img.shape[0] - short_edge) / 2)
     xx = int((img.shape[1] - short_edge) / 2)
-    crop_img = img[yy : yy + short_edge, xx : xx + short_edge]
+    crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
     resized_img = skimage.transform.resize(crop_img, (size, size))
     return resized_img
+
 
 def load_mean_bgr():
     """ bgr mean pixel value image, [0, 255]. [height, width, 3] """
@@ -97,7 +99,8 @@ def load_mean_bgr():
     mean_bgr = caffe.io.blobproto_to_array(blob)[0]
     assert mean_bgr.shape == (3, 224, 224)
 
-    return mean_bgr.transpose((1,2,0))
+    return mean_bgr.transpose((1, 2, 0))
+
 
 def load_caffe(img_p, layers=50):
     caffe.set_mode_cpu()
@@ -106,7 +109,7 @@ def load_caffe(img_p, layers=50):
     caffemodel = "data/ResNet-%d-model.caffemodel" % layers
     net = caffe.Net(prototxt, caffemodel, caffe.TEST)
 
-    net.blobs['data'].data[0] = img_p.transpose((2,0,1))
+    net.blobs['data'].data[0] = img_p.transpose((2, 0, 1))
     assert net.blobs['data'].data[0].shape == (3, 224, 224)
     net.forward()
 
@@ -115,18 +118,19 @@ def load_caffe(img_p, layers=50):
 
     return net
 
+
 # returns the top1 string
 def print_prob(prob):
-  #print prob
-  pred = np.argsort(prob)[::-1]
+    #print prob
+    pred = np.argsort(prob)[::-1]
 
-  # Get top1 label
-  top1 = synset[pred[0]]
-  print "Top1: ", top1
-  # Get top5 label
-  top5 = [synset[pred[i]] for i in range(5)]
-  print "Top5: ", top5
-  return top1
+    # Get top1 label
+    top1 = synset[pred[0]]
+    print "Top1: ", top1
+    # Get top5 label
+    top5 = [synset[pred[i]] for i in range(5)]
+    print "Top5: ", top5
+    return top1
 
 
 def parse_tf_varnames(p, tf_varname, num_layers):
@@ -211,12 +215,15 @@ def parse_tf_varnames(p, tf_varname, num_layers):
         return p.bn_variance('bn%d%s_branch%d%s' % x)
 
     raise ValueError('unhandled var ' + tf_varname)
-    
-def checkpoint_fn(layers):    
+
+
+def checkpoint_fn(layers):
     return 'ResNet-L%d.ckpt' % layers
 
-def meta_fn(layers):    
+
+def meta_fn(layers):
     return 'ResNet-L%d.meta' % layers
+
 
 def convert(graph, img, img_p, layers):
     caffe_model = load_caffe(img_p, layers)
@@ -227,11 +234,11 @@ def convert(graph, img, img_p, layers):
     param_provider = CaffeParamProvider(caffe_model)
 
     if layers == 50:
-        num_blocks=[3, 4, 6, 3]
+        num_blocks = [3, 4, 6, 3]
     elif layers == 101:
-        num_blocks=[3, 4, 23, 3]
+        num_blocks = [3, 4, 23, 3]
     elif layers == 152:
-        num_blocks=[3, 8, 36, 3]
+        num_blocks = [3, 8, 36, 3]
 
     with tf.device('/cpu:0'):
         images = tf.placeholder("float32", [None, 224, 224, 3], name="images")
@@ -255,7 +262,7 @@ def convert(graph, img, img_p, layers):
 
     assigns = []
     for var in vars_to_restore:
-        #print var.op.name 
+        #print var.op.name
         data = parse_tf_varnames(param_provider, var.op.name, layers)
         #print "caffe data shape", data.shape
         #print "tf shape", var.get_shape()
@@ -264,7 +271,6 @@ def convert(graph, img, img_p, layers):
 
     #for op in tf.get_default_graph().get_operations():
     #    print op.name
-
 
     i = [
         graph.get_tensor_by_name("scale1/Relu:0"),
@@ -278,9 +284,7 @@ def convert(graph, img, img_p, layers):
         graph.get_tensor_by_name("prob:0"),
     ]
 
-    o = sess.run(i, {
-        images: img[np.newaxis,:]
-    })
+    o = sess.run(i, {images: img[np.newaxis, :]})
 
     assert_almost_equal(caffe_model.blobs['conv1'].data, o[0])
     assert_almost_equal(caffe_model.blobs['pool1'].data, o[1])
@@ -295,7 +299,7 @@ def convert(graph, img, img_p, layers):
 
     prob_dist = np.linalg.norm(caffe_model.blobs['prob'].data - o[8])
     print 'prob_dist ', prob_dist
-    assert prob_dist < 0.2 # XXX can this be tightened?
+    assert prob_dist < 0.2  # XXX can this be tightened?
 
     # We've already written the metagraph to avoid a bunch of assign ops.
     saver.save(sess, checkpoint_fn(layers), write_meta_graph=False)
@@ -308,7 +312,7 @@ def save_graph(save_path):
     graph_def_s = graph_def.SerializeToString()
 
     with open(save_path, "wb") as f:
-      f.write(graph_def_s)
+        f.write(graph_def_s)
 
     print "saved model to %s" % save_path
 
