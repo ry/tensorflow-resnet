@@ -116,8 +116,8 @@ def main(_):
     graph_def = tf.GraphDef()
     graph_def.ParseFromString(fileContent)
 
-    images = tf.placeholder("float", [None, FLAGS.crop_size, FLAGS.crop_size, 3
-                                      ])
+    images = tf.placeholder("float", [None, FLAGS.crop_size, FLAGS.crop_size,
+                                      3])
 
     tf.import_graph_def(graph_def, input_map={"images": images})
     print "graph loaded from disk"
