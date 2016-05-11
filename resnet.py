@@ -44,7 +44,7 @@ def train(images, labels):
                        bottleneck=False,
                        num_blocks=[2, 2, 2, 2])
 
-    loss_ = loss(logits, labels, batch_size=FLAGS.batch_size)
+    loss_ = loss(logits, labels)
 
     # loss_avg
     ema = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY, global_step)
@@ -210,31 +210,11 @@ def _imagenet_preprocess(rgb):
     return bgr
 
 
-def loss(logits, labels, batch_size=None, label_smoothing=0.1):
-    if not batch_size:
-        batch_size = FLAGS.batch_size
-
-    num_classes = logits.get_shape()[-1].value
-
-    # Reshape the labels into a dense Tensor of
-    # shape [batch_size, num_classes].
-    sparse_labels = tf.reshape(labels, [batch_size, 1])
-    indices = tf.reshape(tf.range(batch_size), [batch_size, 1])
-    concated = tf.concat(1, [indices, sparse_labels])
-    one_hot_labels = tf.sparse_to_dense(concated, [batch_size, num_classes],
-                                        1.0, 0.0)
-
-    if label_smoothing > 0:
-        smooth_positives = 1.0 - label_smoothing
-        smooth_negatives = label_smoothing / num_classes
-        one_hot_labels = one_hot_labels * smooth_positives + smooth_negatives
-
-    cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits,
-                                                            one_hot_labels)
+def loss(logits, labels):
+    cross_entropy = tf.nn.sparse_softmax_cross_entropy_with_logits(logits, labels)
     cross_entropy_mean = tf.reduce_mean(cross_entropy)
-
-    regularization_losses = tf.get_collection(
-        tf.GraphKeys.REGULARIZATION_LOSSES)
+ 
+    regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
 
     loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
     tf.scalar_summary('loss', loss_)

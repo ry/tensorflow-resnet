@@ -44,8 +44,6 @@ import tensorflow as tf
 
 FLAGS = tf.app.flags.FLAGS
 
-tf.app.flags.DEFINE_integer('image_size', 299,
-                            """Provide square images of this size.""")
 tf.app.flags.DEFINE_integer('num_preprocess_threads', 4,
                             """Number of preprocessing threads per tower. """
                             """Please make this a multiple of 4.""")
@@ -217,39 +215,9 @@ def distort_image(image, height, width, bbox, thread_id=0, scope=None):
     3-D float Tensor of distorted image used for training.
   """
     with tf.op_scope([image, height, width, bbox], scope, 'distort_image'):
-        # Each bounding box has shape [1, num_boxes, box coords] and
-        # the coordinates are ordered [ymin, xmin, ymax, xmax].
-
-        # Display the bounding box in the first thread only.
-        if not thread_id:
-            image_with_box = tf.image.draw_bounding_boxes(
-                tf.expand_dims(image, 0), bbox)
-            tf.image_summary('image_with_bounding_boxes', image_with_box)
-
-    # A large fraction of image datasets contain a human-annotated bounding
-    # box delineating the region of the image containing the object of interest.
-    # We choose to create a new bounding box for the object which is a randomly
-    # distorted version of the human-annotated bounding box that obeys an allowed
-    # range of aspect ratios, sizes and overlap with the human-annotated
-    # bounding box. If no box is supplied, then we assume the bounding box is
-    # the entire image.
-        sample_distorted_bounding_box = tf.image.sample_distorted_bounding_box(
-            tf.shape(image),
-            bounding_boxes=bbox,
-            min_object_covered=0.1,
-            aspect_ratio_range=[0.75, 1.33],
-            area_range=[0.05, 1.0],
-            max_attempts=100,
-            use_image_if_no_bounding_boxes=True)
-        bbox_begin, bbox_size, distort_bbox = sample_distorted_bounding_box
-        if not thread_id:
-            image_with_distorted_box = tf.image.draw_bounding_boxes(
-                tf.expand_dims(image, 0), distort_bbox)
-            tf.image_summary('images_with_distorted_bounding_box',
-                             image_with_distorted_box)
 
         # Crop the image to the specified bounding box.
-        distorted_image = tf.slice(image, bbox_begin, bbox_size)
+        distorted_image = image #tf.slice(image, bbox_begin, bbox_size)
 
         # This resizing operation may distort the images because the aspect
         # ratio is not respected. We select a resize method in a round robin
@@ -322,8 +290,8 @@ def image_preprocessing(image_buffer, bbox, train, thread_id=0):
         raise ValueError('Please supply a bounding box.')
 
     image = decode_jpeg(image_buffer)
-    height = FLAGS.image_size
-    width = FLAGS.image_size
+    height = FLAGS.input_size
+    width = FLAGS.input_size
 
     if train:
         image = distort_image(image, height, width, bbox, thread_id)
@@ -364,7 +332,7 @@ def parse_example_proto(example_serialized):
       Example protocol buffer.
 
   Returns:
-    image_buffer: Tensor tf.string containing the contents of a JPEG file.
+    filename: Tensor tf.string containing the filename
     label: Tensor tf.int32 containing the label.
     bbox: 3-D float Tensor of bounding boxes arranged [1, num_boxes, coords]
       where each coordinate is [0, 1) and the coordinates are arranged as
@@ -373,7 +341,7 @@ def parse_example_proto(example_serialized):
   """
     # Dense features in Example proto.
     feature_map = {
-        'image/encoded': tf.FixedLenFeature(
+        'image/filename': tf.FixedLenFeature(
             [], dtype=tf.string, default_value=''),
         'image/class/label': tf.FixedLenFeature(
             [1], dtype=tf.int64, default_value=-1),
@@ -403,7 +371,7 @@ def parse_example_proto(example_serialized):
     bbox = tf.expand_dims(bbox, 0)
     bbox = tf.transpose(bbox, [0, 2, 1])
 
-    return features['image/encoded'], label, bbox, features['image/class/text']
+    return features['image/filename'], label, bbox, features['image/class/text']
 
 
 def batch_inputs(dataset,
@@ -472,26 +440,23 @@ def batch_inputs(dataset,
                 capacity=examples_per_shard + 3 * batch_size,
                 dtypes=[tf.string])
 
-        # Create multiple readers to populate the queue of examples.
-        if num_readers > 1:
-            enqueue_ops = []
-            for _ in range(num_readers):
-                reader = dataset.reader()
-                _, value = reader.read(filename_queue)
-                enqueue_ops.append(examples_queue.enqueue([value]))
+        reader = tf.TFRecordReader()
+        _, example_serialized = reader.read(filename_queue)
+        filename, label_index, bbox, label_text = parse_example_proto(example_serialized)
 
-            tf.train.queue_runner.add_queue_runner(
-                tf.train.queue_runner.QueueRunner(examples_queue, enqueue_ops))
-            example_serialized = examples_queue.dequeue()
-        else:
-            reader = dataset.reader()
-            _, example_serialized = reader.read(filename_queue)
+        fn = FLAGS.data_dir + '/' + label_text + '/' + filename
+
+        examples_qr = tf.train.queue_runner.QueueRunner(examples_queue,
+            [examples_queue.enqueue([fn])])
+        tf.train.queue_runner.add_queue_runner(examples_qr)
 
         images_and_labels = []
         for thread_id in range(num_preprocess_threads):
             # Parse a serialized Example proto to extract the image and metadata.
-            image_buffer, label_index, bbox, _ = parse_example_proto(
-                example_serialized)
+
+            whole_file_reader = tf.WholeFileReader()
+            _, image_buffer = whole_file_reader.read(examples_queue)
+
             image = image_preprocessing(image_buffer, bbox, train, thread_id)
             images_and_labels.append([image, label_index])
 

@@ -9,10 +9,10 @@ import re
 import numpy as np
 
 from synset import *
-from image_processing import distorted_inputs
+from image_processing import image_preprocessing
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_string('data_dir', '/home/ryan/data/imagenet-tf-records/',
+tf.app.flags.DEFINE_string('data_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_img_train',
                            'imagenet dir')
 
 
@@ -20,17 +20,9 @@ class DataSet:
     def __init__(self, data_dir):
         self.subset = 'train'
 
-    def reader(self):
-        return tf.TFRecordReader()
-
     def data_files(self):
-        tf_record_pattern = os.path.join(FLAGS.data_dir, '%s-*' % self.subset)
-        data_files = tf.gfile.Glob(tf_record_pattern)
-        if not data_files:
-            print('No files found for dataset %s/%s at %s' %
-                  (self.name, self.subset, FLAGS.data_dir))
-            sys.exit(-1)
-        return data_files
+        tf_record_pattern = os.path.join(FLAGS.data_dir + '.tfrecords')
+        return [ tf_record_pattern ]
 
 
 def file_list(data_dir):
@@ -95,10 +87,45 @@ def load_image(path, size):
 
     return img
 
+def distorted_inputs():
+    data = load_data(FLAGS.data_dir)
+
+    filenames = [ d['filename'] for d in data ]
+    label_indexes = [ d['label_index'] for d in data ]
+
+    filename, label_index = tf.train.slice_input_producer([filenames, label_indexes], shuffle=True)
+
+    num_preprocess_threads = 4
+    images_and_labels = []
+    for thread_id in range(num_preprocess_threads):
+        image_buffer = tf.read_file(filename)
+
+        bbox = []
+        train = True
+        image = image_preprocessing(image_buffer, bbox, train, thread_id)
+        images_and_labels.append([image, label_index])
+
+    images, label_index_batch = tf.train.batch_join(
+        images_and_labels,
+        batch_size=FLAGS.batch_size,
+        capacity=2 * num_preprocess_threads * FLAGS.batch_size)
+
+    height = FLAGS.input_size
+    width = FLAGS.input_size
+    depth = 3
+
+    images = tf.cast(images, tf.float32)
+    images = tf.reshape(images, shape=[FLAGS.batch_size, height, width, depth])
+
+    # Display the training images in the visualizer.
+    tf.image_summary('images', images)
+
+    return images, tf.reshape(label_index_batch, [FLAGS.batch_size])
+
 
 def main(_):
     dataset = DataSet(FLAGS.data_dir)
-    images, labels = distorted_inputs(dataset, FLAGS.batch_size)
+    images, labels = distorted_inputs()
     resnet.train(images, labels)
 
 
