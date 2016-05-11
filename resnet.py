@@ -26,6 +26,7 @@ tf.app.flags.DEFINE_boolean('resume', False,
                             'resume from latest saved state')
 
 
+activation = tf.nn.relu
 
 
 def inference(x, is_training,
@@ -39,7 +40,7 @@ def inference(x, is_training,
     with tf.variable_scope('scale1'):
         x = _conv(x, 64, ksize=7, stride=2)
         x = _bn(x, is_training)
-        x = _relu(x)
+        x = activation(x)
 
     with tf.variable_scope('scale2'):
         x = _max_pool(x, ksize=3, stride=2)
@@ -76,7 +77,7 @@ def inference_small(x,
     with tf.variable_scope('scale1'):
         x = _conv(x, 16, ksize=3, stride=1)
         x = _bn(x, is_training)
-        x = _relu(x)
+        x = activation(x)
 
         x = stack(x, num_blocks, 16, bottleneck, is_training, stride=1)
 
@@ -144,12 +145,12 @@ def block(x, filters_internal, is_training, stride, bottleneck):
         with tf.variable_scope('a'):
             x = _conv(x, filters_internal, ksize=1, stride=stride)
             x = _bn(x, is_training)
-            x = _relu(x)
+            x = activation(x)
 
         with tf.variable_scope('b'):
             x = _conv(x, filters_internal, ksize=3, stride=1)
             x = _bn(x, is_training)
-            x = _relu(x)
+            x = activation(x)
 
         with tf.variable_scope('c'):
             x = _conv(x, filters_out, ksize=1, stride=1)
@@ -158,7 +159,7 @@ def block(x, filters_internal, is_training, stride, bottleneck):
         with tf.variable_scope('A'):
             x = _conv(x, filters_internal, ksize=3, stride=stride)
             x = _bn(x, is_training)
-            x = _relu(x)
+            x = activation(x)
 
         with tf.variable_scope('B'):
             x = _conv(x, filters_out, ksize=3, stride=1)
@@ -169,11 +170,7 @@ def block(x, filters_internal, is_training, stride, bottleneck):
             shortcut = _conv(shortcut, filters_out, ksize=1, stride=stride)
             shortcut = _bn(shortcut, is_training)
 
-    return _relu(x + shortcut)
-
-
-def _relu(x):
-    return tf.nn.relu(x)
+    return activation(x + shortcut)
 
 
 def _bn(x, is_training):
