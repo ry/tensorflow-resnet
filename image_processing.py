@@ -103,41 +103,6 @@ def inputs(dataset, batch_size=None, num_preprocess_threads=None):
     return images, labels
 
 
-def distorted_inputs(dataset, batch_size=None, num_preprocess_threads=None):
-    """Generate batches of distorted versions of ImageNet images.
-
-  Use this function as the inputs for training a network.
-
-  Distorting images provides a useful technique for augmenting the data
-  set during training in order to make the network invariant to aspects
-  of the image that do not effect the label.
-
-  Args:
-    dataset: instance of Dataset class specifying the dataset.
-    batch_size: integer, number of examples in batch
-    num_preprocess_threads: integer, total number of preprocessing threads but
-      None defaults to FLAGS.num_preprocess_threads.
-
-  Returns:
-    images: Images. 4D tensor of size [batch_size, FLAGS.image_size,
-                                       FLAGS.image_size, 3].
-    labels: 1-D integer Tensor of [batch_size].
-  """
-    if not batch_size:
-        batch_size = FLAGS.batch_size
-
-    # Force all input processing onto CPU in order to reserve the GPU for
-    # the forward inference and back-propagation.
-    with tf.device('/cpu:0'):
-        images, labels = batch_inputs(
-            dataset,
-            batch_size,
-            train=True,
-            num_preprocess_threads=num_preprocess_threads,
-            num_readers=FLAGS.num_readers)
-    return images, labels
-
-
 def decode_jpeg(image_buffer, scope=None):
     """Decode a JPEG string into one 3-D float image Tensor.
 
@@ -216,8 +181,10 @@ def distort_image(image, height, width, bbox, thread_id=0, scope=None):
   """
     with tf.op_scope([image, height, width, bbox], scope, 'distort_image'):
 
-        # Crop the image to the specified bounding box.
-        distorted_image = image #tf.slice(image, bbox_begin, bbox_size)
+        # NOTE(ry) I unceremoniously removed all the bounding box code.
+        # Original here: https://github.com/tensorflow/models/blob/148a15fb043dacdd1595eb4c5267705fbd362c6a/inception/inception/image_processing.py
+
+        distorted_image = image
 
         # This resizing operation may distort the images because the aspect
         # ratio is not respected. We select a resize method in a round robin

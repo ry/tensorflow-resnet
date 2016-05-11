@@ -1,6 +1,10 @@
-# ResNet Model in TensorFlow
+# ResNet in TensorFlow
 
-This is the second version of my ResNet implementation.
+Implemenation of [Deep Residual Learning for Image
+Recognition](http://arxiv.org/abs/1512.03385).  Includes a tool to use He et
+al's published trained Caffe weights in TensorFlow.
+
+MIT license. Contributions welcome.
 
 ## Goals
 
@@ -13,16 +17,20 @@ This is the second version of my ResNet implementation.
   not using any classes and making heavy use of variable scope. It should be
   easily usable in other models.
 
-* Expierment with changes to ResNet like [stochastic
+* Foundation to experiment with changes to ResNet like [stochastic
   depth](https://arxiv.org/abs/1603.09382), [shared weights at each
-  scale](https://arxiv.org/abs/1604.03640), and 1D convolutions for audio.
+  scale](https://arxiv.org/abs/1604.03640), and 1D convolutions for audio. (Not yet implemented.)
 
-* ResNet is fully convolutional and the implementation should allow inputs to
-  be any size.
+* ResNet is fully convolutional and the implementation should allow inputs to be any size.
+
+* Be able to train out of the box on CIFAR-10, 100, and ImageNet.
+
 
 ## Pretrained Model
 
-Instead of running `convert.py`, which depends on Caffe, you can download the converted model thru BitTorrent:
+To convert the published Caffe pretrained model, run `convert.py`. However
+Caffe is annoying to install so I'm providing a download of the output of
+convert.py: 
 
 [tensorflow-resnet-pretrained-20160509.tar.gz.torrent](https://raw.githubusercontent.com/ry/tensorflow-resnet/master/data/tensorflow-resnet-pretrained-20160509.tar.gz.torrent)  464M
 
@@ -39,4 +47,4 @@ Instead of running `convert.py`, which depends on Caffe, you can download the co
   TF and Caffe handle padding. Also preprocessing is done with color-channel means 
   instead of pixel-wise means.
 
-* ResNet is full convolutional. You can resize the network input down to 65x65 images.
+

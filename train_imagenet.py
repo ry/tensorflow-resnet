@@ -1,6 +1,6 @@
 import skimage.io  # bug. need to import this before tensorflow
 import skimage.transform  # bug. need to import this before tensorflow
-import resnet
+from resnet_train import train
 import tensorflow as tf
 import time
 import os
@@ -14,15 +14,6 @@ from image_processing import image_preprocessing
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('data_dir', '/home/ryan/data/ILSVRC2012/ILSVRC2012_img_train',
                            'imagenet dir')
-
-
-class DataSet:
-    def __init__(self, data_dir):
-        self.subset = 'train'
-
-    def data_files(self):
-        tf_record_pattern = os.path.join(FLAGS.data_dir + '.tfrecords')
-        return [ tf_record_pattern ]
 
 
 def file_list(data_dir):
@@ -129,9 +120,9 @@ def main(_):
             tf.gfile.DeleteRecursively(FLAGS.train_dir)
         tf.gfile.MakeDirs(FLAGS.train_dir)
 
-    dataset = DataSet(FLAGS.data_dir)
     images, labels = distorted_inputs()
-    resnet.train(images, labels)
+
+    train(images, labels)
 
 
 if __name__ == '__main__':

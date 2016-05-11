@@ -25,7 +25,7 @@ import tarfile
 from six.moves import xrange  # pylint: disable=redefined-builtin
 from six.moves import urllib
 
-import resnet
+from resnet_train import train
 import tensorflow as tf
 
 DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz'
@@ -296,7 +296,7 @@ def main(argv=None):  # pylint: disable=unused-argument
         tf.gfile.MakeDirs(FLAGS.train_dir)
 
     images, labels = distorted_inputs(FLAGS.data_dir, FLAGS.batch_size)
-    resnet.train(images, labels, small=True)
+    train(images, labels, small=True)
 
 
 if __name__ == '__main__':
