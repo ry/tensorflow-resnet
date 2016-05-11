@@ -289,12 +289,14 @@ def maybe_download_and_extract():
 
 def main(argv=None):  # pylint: disable=unused-argument
     maybe_download_and_extract()
-    if tf.gfile.Exists(FLAGS.train_dir):
-        tf.gfile.DeleteRecursively(FLAGS.train_dir)
-    tf.gfile.MakeDirs(FLAGS.train_dir)
+
+    if not FLAGS.resume:
+        if tf.gfile.Exists(FLAGS.train_dir):
+            tf.gfile.DeleteRecursively(FLAGS.train_dir)
+        tf.gfile.MakeDirs(FLAGS.train_dir)
 
     images, labels = distorted_inputs(FLAGS.data_dir, FLAGS.batch_size)
-    resnet.train(images, labels)
+    resnet.train(images, labels, small=True)
 
 
 if __name__ == '__main__':
