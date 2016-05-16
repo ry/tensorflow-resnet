@@ -57,27 +57,6 @@ def load_data(data_dir):
     return data
 
 
-# Returns a numpy array of shape [size, size, 3]
-def load_image(path, size):
-    img = skimage.io.imread(path)
-
-    short_edge = min(img.shape[:2])
-    yy = int((img.shape[0] - short_edge) / 2)
-    xx = int((img.shape[1] - short_edge) / 2)
-    crop_img = img[yy:yy + short_edge, xx:xx + short_edge]
-
-    img = skimage.transform.resize(crop_img, (size, size))
-
-    # if it's a black and white photo, we need to change it to 3 channel
-    # or raise an error if we're not allowing b&w (which we do during training)
-    if len(img.shape) == 2:
-        img = np.stack([img, img, img], axis=-1)
-
-    assert img.shape == (size, size, 3)
-    assert (0 <= img).all() and (img <= 1.0).all()
-
-    return img
-
 def distorted_inputs():
     data = load_data(FLAGS.data_dir)
 
