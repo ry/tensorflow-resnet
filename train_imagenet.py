@@ -115,11 +115,6 @@ def distorted_inputs():
 
 
 def main(_):
-    if not FLAGS.resume:
-        if tf.gfile.Exists(FLAGS.train_dir):
-            tf.gfile.DeleteRecursively(FLAGS.train_dir)
-        tf.gfile.MakeDirs(FLAGS.train_dir)
-
     images, labels = distorted_inputs()
 
     train(images, labels)
