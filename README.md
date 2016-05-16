@@ -23,7 +23,7 @@ MIT license. Contributions welcome.
 
 * ResNet is fully convolutional and the implementation should allow inputs to be any size.
 
-* Be able to train out of the box on CIFAR-10, 100, and ImageNet.
+* Be able to train out of the box on CIFAR-10, 100, and ImageNet. (Implementation incomplete)
 
 
 ## Pretrained Model
