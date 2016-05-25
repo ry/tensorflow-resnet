@@ -9,6 +9,8 @@ tf.app.flags.DEFINE_string('train_dir', '/tmp/resnet_train',
                            """and checkpoint.""")
 tf.app.flags.DEFINE_float('learning_rate', 0.1, "learning rate.")
 tf.app.flags.DEFINE_integer('batch_size', 16, "batch size")
+tf.app.flags.DEFINE_boolean('resume', False,
+                            'resume from latest saved state')
 
 
 def train(images, labels, small=False):

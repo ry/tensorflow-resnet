@@ -22,8 +22,6 @@ IMAGENET_MEAN_BGR = [103.062623801, 115.902882574, 123.151630838, ]
 
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('input_size', 224, "input image size")
-tf.app.flags.DEFINE_boolean('resume', False,
-                            'resume from latest saved state')
 
 
 activation = tf.nn.relu
