@@ -30,6 +30,7 @@ activation = tf.nn.relu
 def inference(x, is_training,
               num_classes=1000,
               num_blocks=[3, 4, 6, 3],  # defaults to 50-layer network
+              use_bias=False, # defaults to using batch norm
               bottleneck=True):
     is_training = tf.convert_to_tensor(is_training,
                                        dtype='bool',
@@ -37,28 +38,30 @@ def inference(x, is_training,
 
     with tf.variable_scope('scale1'):
         x = _conv(x, 64, ksize=7, stride=2)
-        x = _bn(x, is_training)
+        x = _bn(x, is_training, use_bias=use_bias)
         x = activation(x)
 
     with tf.variable_scope('scale2'):
         x = _max_pool(x, ksize=3, stride=2)
-        x = stack(x, num_blocks[0], 64, bottleneck, is_training, stride=1)
+        x = stack(x, num_blocks[0], 64, bottleneck, is_training, stride=1, use_bias=use_bias)
 
     with tf.variable_scope('scale3'):
-        x = stack(x, num_blocks[1], 128, bottleneck, is_training, stride=2)
+        x = stack(x, num_blocks[1], 128, bottleneck, is_training, stride=2, use_bias=use_bias)
 
     with tf.variable_scope('scale4'):
-        x = stack(x, num_blocks[2], 256, bottleneck, is_training, stride=2)
+        x = stack(x, num_blocks[2], 256, bottleneck, is_training, stride=2, use_bias=use_bias)
 
     with tf.variable_scope('scale5'):
-        x = stack(x, num_blocks[3], 512, bottleneck, is_training, stride=2)
+        x = stack(x, num_blocks[3], 512, bottleneck, is_training, stride=2, use_bias=use_bias)
 
     # post-net
     x = tf.reduce_mean(x, reduction_indices=[1, 2], name="avg_pool")
-    with tf.variable_scope('fc'):
-        logits = _fc(x, num_units_out=num_classes)
 
-    return logits
+    if num_classes != None:
+        with tf.variable_scope('fc'):
+            x = _fc(x, num_units_out=num_classes)
+
+    return x
 
 
 # This is what they use for CIFAR-10 and 100.
@@ -66,6 +69,7 @@ def inference(x, is_training,
 def inference_small(x,
                     is_training,
                     num_blocks=3, # 6n+2 total weight layers will be used.
+                    use_bias=False, # defaults to using batch norm
                     num_classes=10):
     bottleneck = False
     is_training = tf.convert_to_tensor(is_training,
@@ -74,23 +78,25 @@ def inference_small(x,
 
     with tf.variable_scope('scale1'):
         x = _conv(x, 16, ksize=3, stride=1)
-        x = _bn(x, is_training)
+        x = _bn(x, is_training, use_bias=use_bias)
         x = activation(x)
 
-        x = stack(x, num_blocks, 16, bottleneck, is_training, stride=1)
+        x = stack(x, num_blocks, 16, bottleneck, is_training, stride=1, use_bias=use_bias)
 
     with tf.variable_scope('scale2'):
-        x = stack(x, num_blocks, 32, bottleneck, is_training, stride=2)
+        x = stack(x, num_blocks, 32, bottleneck, is_training, stride=2, use_bias=use_bias)
 
     with tf.variable_scope('scale3'):
-        x = stack(x, num_blocks, 64, bottleneck, is_training, stride=2)
+        x = stack(x, num_blocks, 64, bottleneck, is_training, stride=2, use_bias=use_bias)
 
     # post-net
     x = tf.reduce_mean(x, reduction_indices=[1, 2], name="avg_pool")
-    with tf.variable_scope('fc'):
-        logits = _fc(x, num_units_out=num_classes)
 
-    return logits
+    if num_classes != None:
+        with tf.variable_scope('fc'):
+            x = _fc(x, num_units_out=num_classes)
+
+    return x
 
 
 def _imagenet_preprocess(rgb):
@@ -113,7 +119,7 @@ def loss(logits, labels):
     return loss_
 
 
-def stack(x, num_blocks, filters_internal, bottleneck, is_training, stride):
+def stack(x, num_blocks, filters_internal, bottleneck, is_training, stride, use_bias):
     for n in range(num_blocks):
         s = stride if n == 0 else 1
         with tf.variable_scope('block%d' % (n + 1)):
@@ -121,11 +127,12 @@ def stack(x, num_blocks, filters_internal, bottleneck, is_training, stride):
                       filters_internal,
                       bottleneck=bottleneck,
                       is_training=is_training,
+                      use_bias=use_bias,
                       stride=s)
     return x
 
 
-def block(x, filters_internal, is_training, stride, bottleneck):
+def block(x, filters_internal, is_training, stride, bottleneck, use_bias):
     filters_in = x.get_shape()[-1]
 
     # Note: filters_out isn't how many filters are outputed. 
@@ -142,38 +149,45 @@ def block(x, filters_internal, is_training, stride, bottleneck):
     if bottleneck:
         with tf.variable_scope('a'):
             x = _conv(x, filters_internal, ksize=1, stride=stride)
-            x = _bn(x, is_training)
+            x = _bn(x, is_training, use_bias)
             x = activation(x)
 
         with tf.variable_scope('b'):
             x = _conv(x, filters_internal, ksize=3, stride=1)
-            x = _bn(x, is_training)
+            x = _bn(x, is_training, use_bias)
             x = activation(x)
 
         with tf.variable_scope('c'):
             x = _conv(x, filters_out, ksize=1, stride=1)
-            x = _bn(x, is_training)
+            x = _bn(x, is_training, use_bias)
     else:
         with tf.variable_scope('A'):
             x = _conv(x, filters_internal, ksize=3, stride=stride)
-            x = _bn(x, is_training)
+            x = _bn(x, is_training, use_bias)
             x = activation(x)
 
         with tf.variable_scope('B'):
             x = _conv(x, filters_out, ksize=3, stride=1)
-            x = _bn(x, is_training)
+            x = _bn(x, is_training, use_bias)
 
     with tf.variable_scope('shortcut'):
         if filters_out != filters_in or stride != 1:
             shortcut = _conv(shortcut, filters_out, ksize=1, stride=stride)
-            shortcut = _bn(shortcut, is_training)
+            shortcut = _bn(shortcut, is_training, use_bias)
 
     return activation(x + shortcut)
 
 
-def _bn(x, is_training):
+def _bn(x, is_training, use_bias):
     x_shape = x.get_shape()
     params_shape = x_shape[-1:]
+
+    if use_bias:
+        bias = _get_variable('bias', params_shape,
+                             initializer=tf.zeros_initializer)
+        return x + bias
+
+
     axis = list(range(len(x_shape) - 1))
 
     beta = _get_variable('beta',
