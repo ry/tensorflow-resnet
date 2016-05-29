@@ -87,16 +87,18 @@ def distorted_inputs():
     images = tf.cast(images, tf.float32)
     images = tf.reshape(images, shape=[FLAGS.batch_size, height, width, depth])
 
-    # Display the training images in the visualizer.
-    tf.image_summary('images', images)
-
     return images, tf.reshape(label_index_batch, [FLAGS.batch_size])
 
 
 def main(_):
     images, labels = distorted_inputs()
 
-    train(images, labels)
+    logits = inference(images,
+                       num_classes=1000,
+                       is_training=True,
+                       bottleneck=False,
+                       num_blocks=[2, 2, 2, 2])
+    train(logits, images, labels)
 
 
 if __name__ == '__main__':

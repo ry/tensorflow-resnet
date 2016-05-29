@@ -26,6 +26,7 @@ from six.moves import xrange  # pylint: disable=redefined-builtin
 from six.moves import urllib
 
 from resnet_train import train
+from resnet import inference_small
 import tensorflow as tf
 
 DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz'
@@ -141,9 +142,6 @@ def _generate_image_and_label_batch(image, label, min_queue_examples,
             num_threads=num_preprocess_threads,
             capacity=min_queue_examples + 3 * batch_size)
 
-    # Display the training images in the visualizer.
-    tf.image_summary('images', images)
-
     return images, tf.reshape(label_batch, [batch_size])
 
 
@@ -223,11 +221,12 @@ def inputs(eval_data, data_dir, batch_size):
     labels: Labels. 1D tensor of [batch_size] size.
   """
     if not eval_data:
+        assert False, "hack. shouldn't go here"
         filenames = [os.path.join(data_dir, 'data_batch_%d.bin' % i)
                      for i in xrange(1, 6)]
         num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
     else:
-        filenames = [os.path.join(data_dir, 'test_batch.bin')]
+        filenames = [os.path.join(data_dir, 'cifar-10-batches-bin', 'test_batch.bin')]
         num_examples_per_epoch = NUM_EXAMPLES_PER_EPOCH_FOR_EVAL
 
     for f in filenames:
@@ -290,8 +289,21 @@ def maybe_download_and_extract():
 def main(argv=None):  # pylint: disable=unused-argument
     maybe_download_and_extract()
 
-    images, labels = distorted_inputs(FLAGS.data_dir, FLAGS.batch_size)
-    train(images, labels, small=True)
+    images_train, labels_train = distorted_inputs(FLAGS.data_dir, FLAGS.batch_size)
+    images_val, labels_val = inputs(True, FLAGS.data_dir, FLAGS.batch_size)
+
+    is_training = tf.placeholder('bool', [], name='is_training')
+
+    images, labels = tf.cond(is_training,
+        lambda: (images_train, labels_train),
+        lambda: (images_val, labels_val))
+
+    logits = inference_small(images,
+                             num_classes=10,
+                             is_training=is_training,
+                             use_bias=False,
+                             num_blocks=3)
+    train(is_training, logits, images, labels)
 
 
 if __name__ == '__main__':
