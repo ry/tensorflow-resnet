@@ -9,6 +9,7 @@ tf.app.flags.DEFINE_string('train_dir', '/tmp/resnet_train',
                            """and checkpoint.""")
 tf.app.flags.DEFINE_float('learning_rate', 0.01, "learning rate.")
 tf.app.flags.DEFINE_integer('batch_size', 16, "batch size")
+tf.app.flags.DEFINE_integer('max_steps', 500000, "max steps")
 tf.app.flags.DEFINE_boolean('resume', False,
                             'resume from latest saved state')
 tf.app.flags.DEFINE_boolean('minimal_summaries', True,
@@ -86,7 +87,7 @@ def train(is_training, logits, images, labels):
         print "resume", latest
         saver.restore(sess, latest)
 
-    while True:
+    for x in xrange(FLAGS.max_steps + 1):
         start_time = time.time()
 
         step = sess.run(global_step)

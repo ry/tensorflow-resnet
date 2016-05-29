@@ -34,6 +34,7 @@ DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz'
 FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('data_dir', '/tmp/cifar-data',
                            'where to store the dataset')
+tf.app.flags.DEFINE_boolean('use_bn', True, 'use batch normalization. otherwise use biases')
 
 # Process images of this size. Note that this differs from the original CIFAR
 # image size of 32 x 32. If one alters this number, then the entire model
@@ -301,7 +302,7 @@ def main(argv=None):  # pylint: disable=unused-argument
     logits = inference_small(images,
                              num_classes=10,
                              is_training=is_training,
-                             use_bias=False,
+                             use_bias=(not FLAGS.use_bn),
                              num_blocks=3)
     train(is_training, logits, images, labels)
 
