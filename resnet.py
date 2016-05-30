@@ -4,6 +4,8 @@ import tensorflow as tf
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.training import moving_averages
 
+from config import Config
+
 import datetime
 import numpy as np
 import os
@@ -20,7 +22,6 @@ RESNET_VARIABLES = 'resnet_variables'
 UPDATE_OPS_COLLECTION = 'resnet_update_ops'  # must be grouped with training op
 IMAGENET_MEAN_BGR = [103.062623801, 115.902882574, 123.151630838, ]
 
-FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer('input_size', 224, "input image size")
 
 
@@ -32,34 +33,55 @@ def inference(x, is_training,
               num_blocks=[3, 4, 6, 3],  # defaults to 50-layer network
               use_bias=False, # defaults to using batch norm
               bottleneck=True):
-    is_training = tf.convert_to_tensor(is_training,
-                                       dtype='bool',
-                                       name='is_training')
+    c = Config()
+    c['bottleneck'] = bottleneck
+    c['is_training'] = tf.convert_to_tensor(is_training,
+                                            dtype='bool',
+                                            name='is_training')
+    c['ksize'] = 3
+    c['stride'] = 1
+    c['use_bias'] = use_bias
+    c['fc_units_out'] = num_classes
+    c['num_blocks'] = num_blocks
+    c['stack_stride'] = 2
 
     with tf.variable_scope('scale1'):
-        x = _conv(x, 64, ksize=7, stride=2)
-        x = _bn(x, is_training, use_bias=use_bias)
+        c['conv_filters_out'] = 64
+        c['ksize'] = 7
+        c['stride'] = 2
+        x = _conv(x, c)
+        x = _bn(x, c)
         x = activation(x)
 
     with tf.variable_scope('scale2'):
         x = _max_pool(x, ksize=3, stride=2)
-        x = stack(x, num_blocks[0], 64, bottleneck, is_training, stride=1, use_bias=use_bias)
+        c['num_blocks'] = num_blocks[0]
+        c['stack_stride'] = 1
+        c['block_filters_internal'] = 64
+        x = stack(x, c)
 
     with tf.variable_scope('scale3'):
-        x = stack(x, num_blocks[1], 128, bottleneck, is_training, stride=2, use_bias=use_bias)
+        c['num_blocks'] = num_blocks[1]
+        c['block_filters_internal'] = 128
+        assert c['stack_stride'] == 2
+        x = stack(x, c)
 
     with tf.variable_scope('scale4'):
-        x = stack(x, num_blocks[2], 256, bottleneck, is_training, stride=2, use_bias=use_bias)
+        c['num_blocks'] = num_blocks[2]
+        c['block_filters_internal'] = 256
+        x = stack(x, c)
 
     with tf.variable_scope('scale5'):
-        x = stack(x, num_blocks[3], 512, bottleneck, is_training, stride=2, use_bias=use_bias)
+        c['num_blocks'] = num_blocks[3]
+        c['block_filters_internal'] = 512
+        x = stack(x, c)
 
     # post-net
     x = tf.reduce_mean(x, reduction_indices=[1, 2], name="avg_pool")
 
     if num_classes != None:
         with tf.variable_scope('fc'):
-            x = _fc(x, num_units_out=num_classes)
+            x = _fc(x, c)
 
     return x
 
@@ -71,30 +93,42 @@ def inference_small(x,
                     num_blocks=3, # 6n+2 total weight layers will be used.
                     use_bias=False, # defaults to using batch norm
                     num_classes=10):
-    bottleneck = False
-    is_training = tf.convert_to_tensor(is_training,
-                                       dtype='bool',
-                                       name='is_training')
+    c = Config()
+    c['bottleneck'] = False
+    c['is_training'] = tf.convert_to_tensor(is_training,
+                                            dtype='bool',
+                                            name='is_training')
+    c['ksize'] = 3
+    c['stride'] = 1
+    c['use_bias'] = use_bias
+    c['fc_units_out'] = num_classes
+    c['num_blocks'] = num_blocks
 
     with tf.variable_scope('scale1'):
-        x = _conv(x, 16, ksize=3, stride=1)
-        x = _bn(x, is_training, use_bias=use_bias)
+        c['conv_filters_out'] = 16
+        c['block_filters_internal'] = 16
+        c['stack_stride'] = 1
+        x = _conv(x, c)
+        x = _bn(x, c)
         x = activation(x)
-
-        x = stack(x, num_blocks, 16, bottleneck, is_training, stride=1, use_bias=use_bias)
+        x = stack(x, c)
 
     with tf.variable_scope('scale2'):
-        x = stack(x, num_blocks, 32, bottleneck, is_training, stride=2, use_bias=use_bias)
+        c['block_filters_internal'] = 32
+        c['stack_stride'] = 2
+        x = stack(x, c)
 
     with tf.variable_scope('scale3'):
-        x = stack(x, num_blocks, 64, bottleneck, is_training, stride=2, use_bias=use_bias)
+        c['block_filters_internal'] = 64
+        c['stack_stride'] = 2
+        x = stack(x, c)
 
     # post-net
     x = tf.reduce_mean(x, reduction_indices=[1, 2], name="avg_pool")
 
     if num_classes != None:
         with tf.variable_scope('fc'):
-            x = _fc(x, num_units_out=num_classes)
+            x = _fc(x, c)
 
     return x
 
@@ -119,70 +153,79 @@ def loss(logits, labels):
     return loss_
 
 
-def stack(x, num_blocks, filters_internal, bottleneck, is_training, stride, use_bias):
-    for n in range(num_blocks):
-        s = stride if n == 0 else 1
+def stack(x, c):
+    for n in range(c['num_blocks']):
+        s = c['stack_stride'] if n == 0 else 1
+        c['block_stride'] = s
         with tf.variable_scope('block%d' % (n + 1)):
-            x = block(x,
-                      filters_internal,
-                      bottleneck=bottleneck,
-                      is_training=is_training,
-                      use_bias=use_bias,
-                      stride=s)
+            x = block(x, c)
     return x
 
 
-def block(x, filters_internal, is_training, stride, bottleneck, use_bias):
+def block(x, c):
     filters_in = x.get_shape()[-1]
 
     # Note: filters_out isn't how many filters are outputed. 
     # That is the case when bottleneck=False but when bottleneck is 
     # True, filters_internal*4 filters are outputted. filters_internal is how many filters
     # the 3x3 convs output internally.
-    if bottleneck:
-        filters_out = 4 * filters_internal
-    else:
-        filters_out = filters_internal
+    m = 4 if c['bottleneck'] else 1
+    filters_out = m * c['block_filters_internal']
 
     shortcut = x  # branch 1
 
-    if bottleneck:
+    c['conv_filters_out'] = c['block_filters_internal']
+
+    if c['bottleneck']:
         with tf.variable_scope('a'):
-            x = _conv(x, filters_internal, ksize=1, stride=stride)
-            x = _bn(x, is_training, use_bias)
+            c['ksize'] = 1
+            c['stride'] = c['block_stride']
+            x = _conv(x, c)
+            x = _bn(x, c)
             x = activation(x)
 
         with tf.variable_scope('b'):
-            x = _conv(x, filters_internal, ksize=3, stride=1)
-            x = _bn(x, is_training, use_bias)
+            x = _conv(x, c)
+            x = _bn(x, c)
             x = activation(x)
 
         with tf.variable_scope('c'):
-            x = _conv(x, filters_out, ksize=1, stride=1)
-            x = _bn(x, is_training, use_bias)
+            c['conv_filters_out'] = filters_out
+            c['ksize'] = 1
+            assert c['stride'] == 1
+            x = _conv(x, c)
+            x = _bn(x, c)
     else:
         with tf.variable_scope('A'):
-            x = _conv(x, filters_internal, ksize=3, stride=stride)
-            x = _bn(x, is_training, use_bias)
+            c['stride'] = c['block_stride']
+            assert c['ksize'] == 3
+            x = _conv(x, c)
+            x = _bn(x, c)
             x = activation(x)
 
         with tf.variable_scope('B'):
-            x = _conv(x, filters_out, ksize=3, stride=1)
-            x = _bn(x, is_training, use_bias)
+            c['conv_filters_out'] = filters_out
+            assert c['ksize'] == 3
+            assert c['stride'] == 1
+            x = _conv(x, c)
+            x = _bn(x, c)
 
     with tf.variable_scope('shortcut'):
-        if filters_out != filters_in or stride != 1:
-            shortcut = _conv(shortcut, filters_out, ksize=1, stride=stride)
-            shortcut = _bn(shortcut, is_training, use_bias)
+        if filters_out != filters_in or c['block_stride'] != 1:
+            c['ksize'] = 1
+            c['stride'] = c['block_stride']
+            c['conv_filters_out'] = filters_out
+            shortcut = _conv(shortcut, c)
+            shortcut = _bn(shortcut, c)
 
     return activation(x + shortcut)
 
 
-def _bn(x, is_training, use_bias):
+def _bn(x, c):
     x_shape = x.get_shape()
     params_shape = x_shape[-1:]
 
-    if use_bias:
+    if c['use_bias']:
         bias = _get_variable('bias', params_shape,
                              initializer=tf.zeros_initializer)
         return x + bias
@@ -216,7 +259,7 @@ def _bn(x, is_training, use_bias):
     tf.add_to_collection(UPDATE_OPS_COLLECTION, update_moving_variance)
 
     mean, variance = control_flow_ops.cond(
-        is_training, lambda: (mean, variance),
+        c['is_training'], lambda: (mean, variance),
         lambda: (moving_mean, moving_variance))
 
     x = tf.nn.batch_normalization(x, mean, variance, beta, gamma, BN_EPSILON)
@@ -225,8 +268,9 @@ def _bn(x, is_training, use_bias):
     return x
 
 
-def _fc(x, num_units_out):
+def _fc(x, c):
     num_units_in = x.get_shape()[1]
+    num_units_out = c['fc_units_out']
     weights_initializer = tf.truncated_normal_initializer(
         stddev=FC_WEIGHT_STDDEV)
 
@@ -263,7 +307,11 @@ def _get_variable(name,
                            trainable=trainable)
 
 
-def _conv(x, filters_out, ksize=3, stride=1):
+def _conv(x, c):
+    ksize = c['ksize']
+    stride = c['stride']
+    filters_out = c['conv_filters_out']
+
     filters_in = x.get_shape()[-1]
     shape = [ksize, ksize, filters_in, filters_out]
     initializer = tf.truncated_normal_initializer(stddev=CONV_WEIGHT_STDDEV)
