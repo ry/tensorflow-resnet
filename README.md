@@ -1,6 +1,6 @@
 # ResNet in TensorFlow
 
-Implemenation of [Deep Residual Learning for Image
+Implementation of [Deep Residual Learning for Image
 Recognition](http://arxiv.org/abs/1512.03385).  Includes a tool to use He et
 al's published trained Caffe weights in TensorFlow.
 
