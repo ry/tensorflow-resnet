@@ -7,12 +7,12 @@ FLAGS = tf.app.flags.FLAGS
 class Config:
     def __init__(self):
         root = self.Scope('')
-        for k, v in FLAGS.__dict__['__flags'].iteritems():
+        for k, v in FLAGS.__dict__['__flags'].items():
             root[k] = v
         self.stack = [ root ]
 
     def iteritems(self):
-        return self.to_dict().iteritems()
+        return self.to_dict().items()
 
     def to_dict(self):
         self._pop_stale()

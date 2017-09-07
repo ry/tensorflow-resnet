@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright 2015 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,6 +28,7 @@ from six.moves import urllib
 
 from resnet_train import train
 from resnet import inference_small
+from SeluResNet import buildCIFARModel
 import tensorflow as tf
 
 DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz'
@@ -192,7 +194,7 @@ def distorted_inputs(data_dir, batch_size):
         distorted_image, lower=0.2, upper=1.8)
 
     # Subtract off the mean and divide by the variance of the pixels.
-    float_image = tf.image.per_image_whitening(distorted_image)
+    float_image = tf.image.per_image_standardization(distorted_image)
 
     # Ensure that the random shuffling has good mixing properties.
     min_fraction_of_examples_in_queue = 0.4
@@ -250,7 +252,7 @@ def inputs(eval_data, data_dir, batch_size):
                                                            width, height)
 
     # Subtract off the mean and divide by the variance of the pixels.
-    float_image = tf.image.per_image_whitening(resized_image)
+    float_image = tf.image.per_image_standardization(resized_image)
 
     # Ensure that the random shuffling has good mixing properties.
     min_fraction_of_examples_in_queue = 0.4
@@ -299,11 +301,11 @@ def main(argv=None):  # pylint: disable=unused-argument
         lambda: (images_train, labels_train),
         lambda: (images_val, labels_val))
 
-    logits = inference_small(images,
-                             num_classes=10,
-                             is_training=is_training,
-                             use_bias=(not FLAGS.use_bn),
-                             num_blocks=3)
+    logits = inference_small(images, 
+            num_classes=10, 
+            is_training=is_training, 
+            use_bias=(not FLAGS.use_bn), 
+            num_blocks=3)
     train(is_training, logits, images, labels)
 
 
