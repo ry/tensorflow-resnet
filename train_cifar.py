@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2015 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,7 +27,6 @@ from six.moves import urllib
 
 from resnet_train import train
 from resnet import inference_small
-from SeluResNet import buildCIFARModel
 import tensorflow as tf
 
 DATA_URL = 'http://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz'
