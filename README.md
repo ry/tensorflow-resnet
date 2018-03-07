@@ -1,3 +1,11 @@
+This code is *very old* and doesn't run on modern TensorFlow. Indeed, TF now
+includes a resnet model in its core library:
+https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/slim/python/slim/nets/resnet_v1.py
+
+Also checkout my new ML project at http://propelml.org/
+
+
+
 # ResNet in TensorFlow
 
 Implemenation of [Deep Residual Learning for Image
