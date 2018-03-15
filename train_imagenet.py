@@ -9,6 +9,7 @@ import re
 import numpy as np
 
 from synset import *
+from resnet import inference
 from image_processing import image_preprocessing
 
 FLAGS = tf.app.flags.FLAGS
