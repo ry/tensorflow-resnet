@@ -39,15 +39,15 @@ def train(is_training, logits, images, labels):
     # loss_avg
     ema = tf.train.ExponentialMovingAverage(MOVING_AVERAGE_DECAY, global_step)
     tf.add_to_collection(UPDATE_OPS_COLLECTION, ema.apply([loss_]))
-    tf.scalar_summary('loss_avg', ema.average(loss_))
+    tf.summary.scalar('loss_avg', ema.average(loss_))
 
     # validation stats
     ema = tf.train.ExponentialMovingAverage(0.9, val_step)
     val_op = tf.group(val_step.assign_add(1), ema.apply([top1_error]))
     top1_error_avg = ema.average(top1_error)
-    tf.scalar_summary('val_top1_error_avg', top1_error_avg)
+    tf.summary.scalar('val_top1_error_avg', top1_error_avg)
 
-    tf.scalar_summary('learning_rate', FLAGS.learning_rate)
+    tf.summary.scalar('learning_rate', FLAGS.learning_rate)
 
     opt = tf.train.MomentumOptimizer(FLAGS.learning_rate, MOMENTUM)
     grads = opt.compute_gradients(loss_)
@@ -67,17 +67,17 @@ def train(is_training, logits, images, labels):
     batchnorm_updates_op = tf.group(*batchnorm_updates)
     train_op = tf.group(apply_gradient_op, batchnorm_updates_op)
 
-    saver = tf.train.Saver(tf.all_variables())
+    saver = tf.train.Saver(tf.global_variables())
 
-    summary_op = tf.merge_all_summaries()
+    summary_op = tf.summary.merge_all()
 
-    init = tf.initialize_all_variables()
+    init = tf.global_variables_initializer()
 
     sess = tf.Session(config=tf.ConfigProto(log_device_placement=False))
     sess.run(init)
     tf.train.start_queue_runners(sess=sess)
 
-    summary_writer = tf.train.SummaryWriter(FLAGS.train_dir, sess.graph)
+    summary_writer = tf.summary.FileWriter(FLAGS.train_dir, sess.graph)
 
     if FLAGS.resume:
         latest = tf.train.latest_checkpoint(FLAGS.train_dir)

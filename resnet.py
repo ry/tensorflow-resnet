@@ -101,7 +101,7 @@ def inference_small(x,
     c['fc_units_out'] = num_classes
     c['num_blocks'] = num_blocks
     c['num_classes'] = num_classes
-    inference_small_config(x, c)
+    return inference_small_config(x, c)
 
 def inference_small_config(x, c):
     c['bottleneck'] = False
@@ -151,7 +151,7 @@ def loss(logits, labels):
     regularization_losses = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
 
     loss_ = tf.add_n([cross_entropy_mean] + regularization_losses)
-    tf.scalar_summary('loss', loss_)
+    tf.summary.scalar('loss', loss_)
 
     return loss_
 
@@ -241,7 +241,7 @@ def bn(x, c):
                          initializer=tf.zeros_initializer)
     gamma = _get_variable('gamma',
                           params_shape,
-                          initializer=tf.ones_initializer)
+                          initializer=tf.ones_initializer())
 
     moving_mean = _get_variable('moving_mean',
                                 params_shape,
@@ -249,7 +249,7 @@ def bn(x, c):
                                 trainable=False)
     moving_variance = _get_variable('moving_variance',
                                     params_shape,
-                                    initializer=tf.ones_initializer,
+                                    initializer=tf.ones_initializer(),
                                     trainable=False)
 
     # These ops will only be preformed when training.
@@ -300,7 +300,7 @@ def _get_variable(name,
         regularizer = tf.contrib.layers.l2_regularizer(weight_decay)
     else:
         regularizer = None
-    collections = [tf.GraphKeys.VARIABLES, RESNET_VARIABLES]
+    collections = [tf.GraphKeys.GLOBAL_VARIABLES, RESNET_VARIABLES]
     return tf.get_variable(name,
                            shape=shape,
                            initializer=initializer,
