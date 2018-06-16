@@ -1,8 +1,0 @@
-*.swp
-*.pyc
-.ipynb_checkpoints/
-*.caffemodel
-*.tfmodel
-checkpoint
-ResNet-L*.ckpt
-ResNet-L*.meta
